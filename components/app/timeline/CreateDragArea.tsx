@@ -12,6 +12,8 @@ interface CreateDragAreaProps {
   zoom: number;
   configDate: string;
   onDragComplete: (tableId: string, startTime: string, duration: number) => void;
+  isDragActive?: boolean;
+  isResizeActive?: boolean;
 }
 
 export function CreateDragArea({
@@ -20,6 +22,8 @@ export function CreateDragArea({
   zoom,
   configDate,
   onDragComplete,
+  isDragActive = false,
+  isResizeActive = false,
 }: CreateDragAreaProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startSlot, setStartSlot] = useState<number | null>(null);
@@ -29,7 +33,23 @@ export function CreateDragArea({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('[data-reservation-block]')) return;
+    
+    // Don't start create drag if:
+    // - A drag or resize is already active
+    // - Clicking on reservation blocks
+    // - Clicking on resize handles
+    if (isDragActive || isResizeActive) {
+      return;
+    }
+    
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('[data-reservation-block]') ||
+      target.dataset.resizeHandle === 'left' ||
+      target.dataset.resizeHandle === 'right'
+    ) {
+      return;
+    }
 
     const rect = areaRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -106,7 +126,7 @@ export function CreateDragArea({
         ref={areaRef}
         className="absolute inset-0 cursor-crosshair"
         onMouseDown={handleMouseDown}
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 1, pointerEvents: 'auto' }}
       />
       {isDragging && startSlot !== null && endSlot !== null && (
         <div

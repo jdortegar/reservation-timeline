@@ -14,6 +14,7 @@ interface ReservationBlockProps {
   isDragging?: boolean;
   onSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.MouseEvent) => void;
+  onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
   configDate: string;
   zoom: number;
   tableIndex: number;
@@ -28,6 +29,7 @@ export function ReservationBlock({
   isDragging: isDraggingProp = false,
   onSelect,
   onDragStart,
+  onResizeStart,
   configDate,
   zoom,
   tableIndex,
@@ -48,6 +50,23 @@ export function ReservationBlock({
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if (isCancelled) return;
+
+    // Check if clicking on resize handle
+    const target = e.target as HTMLElement;
+    if (target.dataset.resizeHandle === 'left' && onResizeStart) {
+      e.stopPropagation();
+      onResizeStart(e, 'left');
+      return;
+    }
+    if (target.dataset.resizeHandle === 'right' && onResizeStart) {
+      e.stopPropagation();
+      onResizeStart(e, 'right');
+      return;
+    }
+
+    // Otherwise, start drag
+    // Stop propagation to prevent CreateDragArea from interfering
+    e.stopPropagation();
     if (onDragStart) {
       onDragStart(e);
     }
@@ -88,6 +107,7 @@ export function ReservationBlock({
             ? 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px)'
             : undefined,
           zIndex: isDraggingProp ? 20 : 5,
+          pointerEvents: 'auto',
         }}
         onClick={(e) => {
           if (!isDraggingProp && !hasDragged && onSelect) {
@@ -121,6 +141,29 @@ export function ReservationBlock({
           <div className="text-xs font-bold mt-0.5 leading-tight">
             {reservation.priority}
           </div>
+        )}
+        {/* Resize handles */}
+        {!isCancelled && !isDraggingProp && (
+          <>
+            <div
+              data-resize-handle="left"
+              className="absolute cursor-ew-resize h-full left-0 top-0 w-2 hover:bg-white/30 transition-colors"
+              style={{
+                borderLeft: '2px solid rgba(255, 255, 255, 0.5)',
+                zIndex: 10,
+                pointerEvents: 'auto',
+              }}
+            />
+            <div
+              data-resize-handle="right"
+              className="absolute cursor-ew-resize h-full right-0 top-0 w-2 hover:bg-white/30 transition-colors"
+              style={{
+                borderRight: '2px solid rgba(255, 255, 255, 0.5)',
+                zIndex: 10,
+                pointerEvents: 'auto',
+              }}
+            />
+          </>
         )}
       </div>
       {showTooltip && (

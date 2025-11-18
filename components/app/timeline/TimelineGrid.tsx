@@ -10,9 +10,11 @@ import { TimelineRow } from './TimelineRow';
 import { ReservationBlock } from './ReservationBlock';
 import { ReservationGhostBlock } from './ReservationGhostBlock';
 import { DropPreviewBlock } from './DropPreviewBlock';
+import { ResizePreviewBlock } from './ResizePreviewBlock';
 import { CreateDragArea } from './CreateDragArea';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { useReservationDrag } from '@/lib/hooks/useReservationDrag';
+import { useReservationResize } from '@/lib/hooks/useReservationResize';
 import type { Reservation, Sector } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
@@ -144,6 +146,19 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       zoom,
     });
 
+  // Use custom hook for resize logic
+  const { resizingReservation, resizePreview, handleResizeStart } =
+    useReservationResize({
+      collapsedSectors,
+      configDate: config.date,
+      gridContainerRef,
+      groupedTables,
+      onUpdateReservation: updateReservation,
+      reservations,
+      visibleTables,
+      zoom,
+    });
+
   const gridWidth = timeSlots.length * 60 * zoom;
   const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
 
@@ -207,15 +222,17 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                       zoom={zoom}
                     >
                       <CreateDragArea
-                        table={table}
-                        timeSlots={timeSlots}
-                        zoom={zoom}
                         configDate={config.date}
+                        isDragActive={!!draggingReservation}
+                        isResizeActive={!!resizingReservation}
                         onDragComplete={(tableId, startTime, duration) => {
                           if (onOpenModal) {
                             onOpenModal(tableId, startTime, duration);
                           }
                         }}
+                        table={table}
+                        timeSlots={timeSlots}
+                        zoom={zoom}
                       />
                       {tableReservations.map((reservation) => {
                         const startTime = parseISO(reservation.startTime);
@@ -235,6 +252,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                         const isDragging =
                           draggingReservation?.reservation.id ===
                           reservation.id;
+                        const isResizing =
+                          resizingReservation?.reservation.id ===
+                          reservation.id;
 
                         return (
                           <ReservationBlock
@@ -246,6 +266,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                             onDragStart={(e) => {
                               handleDragStart(reservation, e, x, absoluteIndex);
                             }}
+                            onResizeStart={(e, edge) => {
+                              handleResizeStart(reservation, edge, e, x);
+                            }}
                             onSelect={(e) => {
                               const { selectReservation } = useStore.getState();
                               selectReservation(
@@ -256,10 +279,17 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                             reservation={reservation}
                             style={{
                               position: 'absolute',
-                              left: x,
+                              left:
+                                isResizing && resizePreview
+                                  ? resizePreview.left - 200
+                                  : x,
                               top: 0,
-                              width,
+                              width:
+                                isResizing && resizePreview
+                                  ? resizePreview.width
+                                  : width,
                               height: 60,
+                              opacity: isResizing ? 0.7 : 1,
                             }}
                             tableIndex={absoluteIndex}
                             visibleTables={visibleTables}
@@ -304,6 +334,21 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
             top={dropPreview.top}
             visibleTables={visibleTables}
             width={dropPreview.width}
+          />
+        )}
+        {/* Resize Preview - shows resize preview with duration */}
+        {resizePreview && resizingReservation && (
+          <ResizePreviewBlock
+            configDate={config.date}
+            endSlotIndex={resizePreview.endSlotIndex}
+            hasConflict={resizePreview.hasConflict}
+            height={60}
+            left={resizePreview.left}
+            newDurationMinutes={resizePreview.newDurationMinutes}
+            reservation={resizingReservation.reservation}
+            startSlotIndex={resizePreview.startSlotIndex}
+            top={resizePreview.top}
+            width={resizePreview.width}
           />
         )}
       </div>
