@@ -31,6 +31,7 @@ export function ReservationBlock({
   return (
     <>
       <div
+        data-reservation-block
         className={clsx(
           'absolute cursor-pointer rounded px-2 py-1 text-white text-xs shadow-lg border border-white/20 transition-all',
           isSelected && 'ring-2 ring-blue-500 ring-offset-1',
@@ -43,6 +44,7 @@ export function ReservationBlock({
           backgroundImage: isCancelled
             ? 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px)'
             : undefined,
+          zIndex: 5,
         }}
         onClick={onSelect}
         onMouseEnter={() => setShowTooltip(true)}

@@ -1,8 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { DndProvider } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/store/store';
 import { TimelineGrid } from './TimelineGrid';
+import { ReservationModal } from './ReservationModal';
 import type { Sector, Table, Reservation } from '@/lib/types/Reservation';
 
 const SEED_SECTORS: Sector[] = [
@@ -160,6 +163,13 @@ const HARDCODED_RESERVATIONS: Reservation[] = [
 
 export function TimelineView() {
   const { config, setSectors, setTables, setReservations } = useStore();
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    tableId?: string;
+    startTime?: string;
+    duration?: number;
+    reservationId?: string;
+  }>({ isOpen: false });
 
   useEffect(() => {
     setSectors(SEED_SECTORS);
@@ -173,5 +183,27 @@ export function TimelineView() {
     setReservations(reservations);
   }, [config.date, setSectors, setTables, setReservations]);
 
-  return <TimelineGrid />;
+  return (
+    <DndProvider backend={HTML5Backend}>
+      <TimelineGrid
+        onOpenModal={(tableId, startTime, duration, reservationId) => {
+          setModalState({
+            isOpen: true,
+            tableId,
+            startTime,
+            duration,
+            reservationId,
+          });
+        }}
+      />
+      <ReservationModal
+        isOpen={modalState.isOpen}
+        onClose={() => setModalState({ isOpen: false })}
+        initialTableId={modalState.tableId}
+        initialStartTime={modalState.startTime}
+        initialDuration={modalState.duration}
+        reservationId={modalState.reservationId}
+      />
+    </DndProvider>
+  );
 }

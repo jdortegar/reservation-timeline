@@ -9,7 +9,17 @@ import { parseISO } from 'date-fns';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineRow } from './TimelineRow';
 import { ReservationBlock } from './ReservationBlock';
+import { CreateDragArea } from './CreateDragArea';
 import type { Reservation, Sector } from '@/lib/types/Reservation';
+
+interface TimelineGridProps {
+  onOpenModal?: (
+    tableId?: string,
+    startTime?: string,
+    duration?: number,
+    reservationId?: string,
+  ) => void;
+}
 
 function SectorHeader({
   sector,
@@ -36,7 +46,7 @@ function SectorHeader({
   );
 }
 
-export function TimelineGrid() {
+export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const {
     config,
     zoom,
@@ -178,6 +188,17 @@ export function TimelineGrid() {
                       timeSlots={timeSlots}
                       zoom={zoom}
                     >
+                      <CreateDragArea
+                        table={table}
+                        timeSlots={timeSlots}
+                        zoom={zoom}
+                        configDate={config.date}
+                        onDragComplete={(tableId, startTime, duration) => {
+                          if (onOpenModal) {
+                            onOpenModal(tableId, startTime, duration);
+                          }
+                        }}
+                      />
                       {tableReservations.map((reservation) => {
                         const startTime = parseISO(reservation.startTime);
                         const slotIndex = timeToSlotIndex(
