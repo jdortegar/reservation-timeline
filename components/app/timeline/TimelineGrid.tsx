@@ -37,8 +37,15 @@ function SectorHeader({
 }
 
 export function TimelineGrid() {
-  const { config, zoom, tables, reservations, sectors, collapsedSectors } =
-    useStore();
+  const {
+    config,
+    zoom,
+    tables,
+    reservations,
+    sectors,
+    collapsedSectors,
+    selectedReservationIds,
+  } = useStore();
 
   const timeSlots = useMemo(() => getTimeSlots(config.date), [config.date]);
 
@@ -182,11 +189,22 @@ export function TimelineGrid() {
                           reservation.durationMinutes,
                           zoom,
                         );
+                        const isSelected = selectedReservationIds.includes(
+                          reservation.id,
+                        );
 
                         return (
                           <ReservationBlock
                             key={reservation.id}
                             reservation={reservation}
+                            isSelected={isSelected}
+                            onSelect={(e) => {
+                              const { selectReservation } = useStore.getState();
+                              selectReservation(
+                                reservation.id,
+                                e.metaKey || e.ctrlKey,
+                              );
+                            }}
                             style={{
                               position: 'absolute',
                               left: x,
