@@ -72,7 +72,6 @@ export function ResizePreviewBlock({
           {reservation.customer.name}
         </div>
         <div className="text-xs opacity-95 leading-tight mt-0.5 flex items-center gap-1">
-          <span>👥</span>
           <span>{reservation.partySize} guests</span>
           <span>•</span>
           <span>{timeRange}</span>
@@ -82,7 +81,7 @@ export function ResizePreviewBlock({
         </div>
         {hasConflict && (
           <div className="text-xs font-bold mt-1 leading-tight text-red-300">
-            ⚠️ Conflict
+            Conflict
           </div>
         )}
       </div>

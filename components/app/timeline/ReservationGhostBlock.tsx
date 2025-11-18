@@ -55,7 +55,6 @@ export function ReservationGhostBlock({
         {reservation.customer.name}
       </div>
       <div className="text-xs opacity-95 leading-tight mt-0.5 flex items-center gap-1 text-white">
-        <span>👥</span>
         <span>{reservation.partySize} guests</span>
         <span>•</span>
         <span>

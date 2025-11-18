@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useStore } from '@/store/store';
 import { getTimeSlots, timeToSlotIndex } from '@/lib/helpers/time';
 import { slotToX, durationToWidth } from '@/lib/helpers/coordinates';
-import { parseISO } from 'date-fns';
+import { parseISO, addMinutes } from 'date-fns';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineRow } from './TimelineRow';
 import { ReservationBlock } from './ReservationBlock';
@@ -12,10 +12,16 @@ import { ReservationGhostBlock } from './ReservationGhostBlock';
 import { DropPreviewBlock } from './DropPreviewBlock';
 import { ResizePreviewBlock } from './ResizePreviewBlock';
 import { CreateDragArea } from './CreateDragArea';
+import { ReservationContextMenu } from './ReservationContextMenu';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { useReservationDrag } from '@/lib/hooks/useReservationDrag';
 import { useReservationResize } from '@/lib/hooks/useReservationResize';
-import type { Reservation, Sector } from '@/lib/types/Reservation';
+import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
+import type {
+  Reservation,
+  Sector,
+  ReservationStatus,
+} from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
   onOpenModal?: (
@@ -45,7 +51,7 @@ function SectorHeader({
       }}
       onClick={onToggle}
     >
-      <span className="mr-2 text-lg">{isCollapsed ? '▶' : '▼'}</span>
+      <span className="mr-2 text-lg">{isCollapsed ? '→' : '↓'}</span>
       {sector.name}
     </div>
   );
@@ -53,6 +59,10 @@ function SectorHeader({
 
 export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const gridContainerRef = useRef<HTMLDivElement>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    reservation: Reservation;
+    position: { x: number; y: number };
+  } | null>(null);
   const {
     config,
     zoom,
@@ -62,6 +72,15 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     collapsedSectors,
     selectedReservationIds,
     updateReservation,
+    deleteReservation,
+    deleteReservations,
+    addReservation,
+    selectReservation,
+    copyReservations,
+    pasteReservations,
+    saveToHistory,
+    undo,
+    redo,
   } = useStore();
 
   const timeSlots = useMemo(() => getTimeSlots(config.date), [config.date]);
@@ -158,6 +177,123 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       visibleTables,
       zoom,
     });
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, reservation: Reservation) => {
+    setContextMenu({
+      reservation,
+      position: { x: e.clientX, y: e.clientY },
+    });
+  };
+
+  const handleEdit = (reservation: Reservation) => {
+    if (onOpenModal) {
+      onOpenModal(
+        reservation.tableId,
+        reservation.startTime,
+        reservation.durationMinutes,
+        reservation.id,
+      );
+    }
+  };
+
+  const handleChangeStatus = (
+    reservationId: string,
+    status: ReservationStatus,
+  ) => {
+    saveToHistory();
+    updateReservation(reservationId, { status });
+  };
+
+  const handleMarkNoShow = (reservationId: string) => {
+    saveToHistory();
+    updateReservation(reservationId, { status: 'NO_SHOW' });
+  };
+
+  const handleCancel = (reservationId: string) => {
+    saveToHistory();
+    updateReservation(reservationId, { status: 'CANCELLED' });
+  };
+
+  const handleDuplicate = (reservation: Reservation) => {
+    saveToHistory();
+    // Duplicate reservation - add 1 hour to start time
+    const newStartTime = addMinutes(parseISO(reservation.startTime), 60);
+    const newEndTime = addMinutes(newStartTime, reservation.durationMinutes);
+
+    const duplicatedReservation: Reservation = {
+      ...reservation,
+      id: `RES_${Date.now()}`,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    addReservation(duplicatedReservation);
+    selectReservation(duplicatedReservation.id);
+  };
+
+  const handleDelete = (reservationId: string) => {
+    saveToHistory();
+    deleteReservation(reservationId);
+  };
+
+  const handleDeleteMultiple = (reservationIds: string[]) => {
+    saveToHistory();
+    deleteReservations(reservationIds);
+  };
+
+  const handleCopy = (reservationsToCopy: Reservation[]) => {
+    copyReservations(reservationsToCopy);
+  };
+
+  const handlePaste = () => {
+    // Paste at current time or first selected reservation's time
+    const targetStartTime =
+      selectedReservationIds.length > 0
+        ? reservations.find((r) => r.id === selectedReservationIds[0])
+            ?.startTime
+        : undefined;
+    saveToHistory();
+    pasteReservations(undefined, targetStartTime);
+  };
+
+  const handleDuplicateMultiple = (reservationIds: string[]) => {
+    const reservationsToDuplicate = reservations.filter((r) =>
+      reservationIds.includes(r.id),
+    );
+    saveToHistory();
+
+    reservationsToDuplicate.forEach((reservation) => {
+      const newStartTime = addMinutes(parseISO(reservation.startTime), 60);
+      const newEndTime = addMinutes(newStartTime, reservation.durationMinutes);
+
+      const duplicatedReservation: Reservation = {
+        ...reservation,
+        id: `RES_${Date.now()}_${reservation.id}`,
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      addReservation(duplicatedReservation);
+    });
+  };
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    enabled: !contextMenu, // Disable when context menu is open
+    onCopy: handleCopy,
+    onDelete: handleDeleteMultiple,
+    onDuplicate: handleDuplicateMultiple,
+    onPaste: handlePaste,
+    onRedo: redo,
+    onUndo: undo,
+    reservations,
+    selectedReservationIds,
+  });
 
   const gridWidth = timeSlots.length * 60 * zoom;
   const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
@@ -269,6 +405,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                             onResizeStart={(e, edge) => {
                               handleResizeStart(reservation, edge, e, x);
                             }}
+                            onContextMenu={handleContextMenu}
                             onSelect={(e) => {
                               const { selectReservation } = useStore.getState();
                               selectReservation(
@@ -349,6 +486,20 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
             startSlotIndex={resizePreview.startSlotIndex}
             top={resizePreview.top}
             width={resizePreview.width}
+          />
+        )}
+        {/* Context Menu */}
+        {contextMenu && (
+          <ReservationContextMenu
+            onCancel={handleCancel}
+            onClose={() => setContextMenu(null)}
+            onDelete={handleDelete}
+            onDuplicate={handleDuplicate}
+            onEdit={handleEdit}
+            onChangeStatus={handleChangeStatus}
+            onMarkNoShow={handleMarkNoShow}
+            position={contextMenu.position}
+            reservation={contextMenu.reservation}
           />
         )}
       </div>

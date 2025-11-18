@@ -15,6 +15,7 @@ interface ReservationBlockProps {
   onSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.MouseEvent) => void;
   onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
+  onContextMenu?: (e: React.MouseEvent, reservation: Reservation) => void;
   configDate: string;
   zoom: number;
   tableIndex: number;
@@ -30,6 +31,7 @@ export function ReservationBlock({
   onSelect,
   onDragStart,
   onResizeStart,
+  onContextMenu,
   configDate,
   zoom,
   tableIndex,
@@ -127,12 +129,18 @@ export function ReservationBlock({
             setShowTooltip(false);
           }
         }}
+        onContextMenu={(e) => {
+          if (!isDraggingProp && !isCancelled && onContextMenu) {
+            e.preventDefault();
+            e.stopPropagation();
+            onContextMenu(e, reservation);
+          }
+        }}
       >
         <div className="font-semibold truncate leading-tight">
           {reservation.customer.name}
         </div>
         <div className="text-xs opacity-95 leading-tight mt-0.5 flex items-center gap-1">
-          <span>👥</span>
           <span>{reservation.partySize} guests</span>
           <span>•</span>
           <span>{timeRange}</span>
