@@ -5,6 +5,23 @@ import { useStore } from '@/store/store';
 import { addMinutes } from 'date-fns';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { checkAllConflicts } from '@/lib/helpers/conflicts';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Reservation, ReservationStatus, Priority } from '@/lib/types/Reservation';
 
 interface ReservationModalProps {
@@ -136,179 +153,173 @@ export function ReservationModal({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">
-          {reservationId ? 'Edit Reservation' : 'Create Reservation'}
-        </h2>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {reservationId ? 'Edit Reservation' : 'Create Reservation'}
+          </DialogTitle>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="customerName">
               Customer Name <span className="text-red-500">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="customerName"
               type="text"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="phone">
               Phone <span className="text-red-500">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
+          <div className="space-y-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="partySize">
               Party Size <span className="text-red-500">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="partySize"
               type="number"
               min={1}
               max={20}
               value={partySize}
               onChange={(e) => setPartySize(parseInt(e.target.value, 10))}
-              className="w-full px-3 py-2 border rounded"
               required
             />
             {selectedTable && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground">
                 Table capacity: {selectedTable.capacity.min}-{selectedTable.capacity.max} seats
               </p>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="table">
               Table <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={tableId}
-              onChange={(e) => setTableId(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-              required
-            >
-              <option value="">Select a table</option>
-              {tables.map((table) => (
-                <option key={table.id} value={table.id}>
-                  {table.name} ({table.capacity.min}-{table.capacity.max} seats)
-                </option>
-              ))}
-            </select>
+            </Label>
+            <Select value={tableId} onValueChange={setTableId}>
+              <SelectTrigger id="table">
+                <SelectValue placeholder="Select a table" />
+              </SelectTrigger>
+              <SelectContent>
+                {tables.map((table) => (
+                  <SelectItem key={table.id} value={table.id}>
+                    {table.name} ({table.capacity.min}-{table.capacity.max} seats)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="startTime">
               Start Time <span className="text-red-500">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="startTime"
               type="datetime-local"
               value={startTime ? new Date(startTime).toISOString().slice(0, 16) : ''}
               onChange={(e) => setStartTime(new Date(e.target.value).toISOString())}
-              className="w-full px-3 py-2 border rounded"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
+          <div className="space-y-2">
+            <Label htmlFor="duration">
               Duration (minutes) <span className="text-red-500">*</span>
-            </label>
-            <input
+            </Label>
+            <Input
+              id="duration"
               type="number"
               min={TIMELINE_CONFIG.MIN_DURATION_MINUTES}
               max={360}
               step={15}
               value={duration}
               onChange={(e) => setDuration(parseInt(e.target.value, 10))}
-              className="w-full px-3 py-2 border rounded"
               required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as ReservationStatus)}
-              className="w-full px-3 py-2 border rounded"
-            >
-              <option value="PENDING">PENDING</option>
-              <option value="CONFIRMED">CONFIRMED</option>
-              <option value="SEATED">SEATED</option>
-              <option value="FINISHED">FINISHED</option>
-              <option value="NO_SHOW">NO_SHOW</option>
-              <option value="CANCELLED">CANCELLED</option>
-            </select>
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <Select value={status} onValueChange={(value) => setStatus(value as ReservationStatus)}>
+              <SelectTrigger id="status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PENDING">PENDING</SelectItem>
+                <SelectItem value="CONFIRMED">CONFIRMED</SelectItem>
+                <SelectItem value="SEATED">SEATED</SelectItem>
+                <SelectItem value="FINISHED">FINISHED</SelectItem>
+                <SelectItem value="NO_SHOW">NO_SHOW</SelectItem>
+                <SelectItem value="CANCELLED">CANCELLED</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Priority</label>
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Priority)}
-              className="w-full px-3 py-2 border rounded"
-            >
-              <option value="STANDARD">STANDARD</option>
-              <option value="VIP">VIP</option>
-              <option value="LARGE_GROUP">LARGE_GROUP</option>
-            </select>
+          <div className="space-y-2">
+            <Label htmlFor="priority">Priority</Label>
+            <Select value={priority} onValueChange={(value) => setPriority(value as Priority)}>
+              <SelectTrigger id="priority">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="STANDARD">STANDARD</SelectItem>
+                <SelectItem value="VIP">VIP</SelectItem>
+                <SelectItem value="LARGE_GROUP">LARGE_GROUP</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Notes</label>
-            <textarea
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes</Label>
+            <Textarea
+              id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
               rows={3}
             />
           </div>
 
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {error && <div className="text-sm text-destructive">{error}</div>}
 
           <div className="flex gap-2 justify-end">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border rounded hover:bg-gray-50"
-            >
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
+            </Button>
+            <Button type="submit">
               {reservationId ? 'Update' : 'Create'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
