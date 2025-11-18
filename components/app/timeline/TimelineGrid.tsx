@@ -359,6 +359,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                     >
                       <CreateDragArea
                         configDate={config.date}
+                        defaultPartySize={2}
                         isDragActive={!!draggingReservation}
                         isResizeActive={!!resizingReservation}
                         onDragComplete={(tableId, startTime, duration) => {
@@ -366,6 +367,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                             onOpenModal(tableId, startTime, duration);
                           }
                         }}
+                        reservations={reservations}
                         table={table}
                         timeSlots={timeSlots}
                         zoom={zoom}
@@ -395,6 +397,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                         return (
                           <ReservationBlock
                             key={reservation.id}
+                            allReservations={reservations}
                             configDate={config.date}
                             gridContainerRef={gridContainerRef}
                             isDragging={isDragging}
@@ -428,6 +431,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                               height: 60,
                               opacity: isResizing ? 0.7 : 1,
                             }}
+                            table={table}
                             tableIndex={absoluteIndex}
                             visibleTables={visibleTables}
                             zoom={zoom}

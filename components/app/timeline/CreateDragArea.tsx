@@ -1,10 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { addMinutes } from 'date-fns';
 import { slotIndexToTime, minutesToSlots, slotsToMinutes } from '@/lib/helpers/time';
 import { slotToX, xToSlot, durationToWidth } from '@/lib/helpers/coordinates';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
-import type { Table } from '@/lib/types/Reservation';
+import { checkAllConflicts } from '@/lib/helpers/conflicts';
+import type { Table, Reservation } from '@/lib/types/Reservation';
 
 interface CreateDragAreaProps {
   table: Table;
@@ -14,6 +16,8 @@ interface CreateDragAreaProps {
   onDragComplete: (tableId: string, startTime: string, duration: number) => void;
   isDragActive?: boolean;
   isResizeActive?: boolean;
+  reservations?: Reservation[];
+  defaultPartySize?: number;
 }
 
 export function CreateDragArea({
@@ -24,11 +28,17 @@ export function CreateDragArea({
   onDragComplete,
   isDragActive = false,
   isResizeActive = false,
+  reservations = [],
+  defaultPartySize = 2,
 }: CreateDragAreaProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [startSlot, setStartSlot] = useState<number | null>(null);
   const [endSlot, setEndSlot] = useState<number | null>(null);
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [hasConflict, setHasConflict] = useState(false);
+  const [conflictReason, setConflictReason] = useState<
+    'overlap' | 'capacity_exceeded' | 'outside_service_hours' | undefined
+  >(undefined);
   const areaRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -80,6 +90,40 @@ export function CreateDragArea({
       const slot = Math.max(startSlot, xToSlot(x, zoom));
       const snappedSlot = Math.floor(slot);
       setEndSlot(snappedSlot);
+
+      // Check for conflicts in real-time
+      const minSlots = minutesToSlots(TIMELINE_CONFIG.MIN_DURATION_MINUTES);
+      const slots = Math.max(minSlots, snappedSlot - startSlot + 1);
+      const duration = slotsToMinutes(slots);
+      const startTime = slotIndexToTime(startSlot, configDate);
+      const endTime = addMinutes(startTime, duration);
+
+      // Create temporary reservation for conflict check
+      const tempReservation: Reservation = {
+        id: 'TEMP',
+        tableId: table.id,
+        customer: {
+          name: 'Temp',
+          phone: '',
+        },
+        partySize: defaultPartySize,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        durationMinutes: duration,
+        status: 'PENDING',
+        priority: 'STANDARD',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const conflictCheck = checkAllConflicts(
+        tempReservation,
+        reservations,
+        table,
+      );
+
+      setHasConflict(conflictCheck.hasConflict);
+      setConflictReason(conflictCheck.reason);
     };
 
     const handleUp = () => {
@@ -88,6 +132,8 @@ export function CreateDragArea({
         setStartSlot(null);
         setEndSlot(null);
         setStartPos(null);
+        setHasConflict(false);
+        setConflictReason(undefined);
         return;
       }
 
@@ -96,7 +142,8 @@ export function CreateDragArea({
       const duration = slotsToMinutes(slots);
       const startTime = slotIndexToTime(startSlot, configDate);
 
-      if (duration >= TIMELINE_CONFIG.MIN_DURATION_MINUTES) {
+      // Only complete if no conflict
+      if (duration >= TIMELINE_CONFIG.MIN_DURATION_MINUTES && !hasConflict) {
         onDragComplete(table.id, startTime.toISOString(), duration);
       }
 
@@ -104,6 +151,8 @@ export function CreateDragArea({
       setStartSlot(null);
       setEndSlot(null);
       setStartPos(null);
+      setHasConflict(false);
+      setConflictReason(undefined);
     };
 
     document.addEventListener('mousemove', handleMove);
@@ -130,13 +179,18 @@ export function CreateDragArea({
       />
       {isDragging && startSlot !== null && endSlot !== null && (
         <div
-          className="absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-30 pointer-events-none"
+          className="absolute border-2 border-dashed pointer-events-none"
           style={{
             left: previewX,
             top: 0,
             width: previewWidth,
             height: TIMELINE_CONFIG.ROW_HEIGHT_PX,
             zIndex: 10,
+            borderColor: hasConflict ? '#EF4444' : '#3B82F6',
+            backgroundColor: hasConflict ? '#EF444420' : '#3B82F620',
+            boxShadow: hasConflict
+              ? '0 0 8px rgba(239, 68, 68, 0.5)'
+              : '0 0 4px rgba(59, 130, 246, 0.3)',
           }}
         />
       )}

@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import { formatTimeRange } from '@/lib/helpers/time';
 import { parseISO } from 'date-fns';
+import { checkAllConflicts, getConflictMessage } from '@/lib/helpers/conflicts';
+import { ReservationTooltip, ConflictTooltip } from './ReservationTooltips';
 import type { Reservation, Table } from '@/lib/types/Reservation';
 import clsx from 'clsx';
 
@@ -21,6 +23,8 @@ interface ReservationBlockProps {
   tableIndex: number;
   visibleTables: Table[];
   gridContainerRef?: React.RefObject<HTMLDivElement | null>;
+  allReservations?: Reservation[];
+  table?: Table;
 }
 
 export function ReservationBlock({
@@ -37,8 +41,11 @@ export function ReservationBlock({
   tableIndex,
   visibleTables,
   gridContainerRef,
+  allReservations = [],
+  table,
 }: ReservationBlockProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [showConflictTooltip, setShowConflictTooltip] = useState(false);
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [hasDragged, setHasDragged] = useState(false);
   const blockRef = useRef<HTMLDivElement>(null);
@@ -48,6 +55,19 @@ export function ReservationBlock({
   const endTime = parseISO(reservation.endTime);
   const timeRange = formatTimeRange(startTime, endTime);
   const isCancelled = reservation.status === 'CANCELLED';
+
+  // Check for conflicts
+  const conflictCheck =
+    table && allReservations.length > 0
+      ? checkAllConflicts(reservation, allReservations, table, reservation.id)
+      : {
+          hasConflict: false,
+          conflictingReservationIds: [],
+          reason: undefined,
+        };
+
+  const hasConflict = conflictCheck.hasConflict;
+  const conflictReason = conflictCheck.reason;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -94,12 +114,16 @@ export function ReservationBlock({
         ref={blockRef}
         data-reservation-block
         className={clsx(
-          'absolute rounded px-2 py-1 text-white text-xs shadow-lg border border-white/20',
+          'absolute rounded px-2 py-1 text-white text-xs shadow-lg border',
           !isDraggingProp && 'transition-all',
           isSelected && 'ring-2 ring-blue-500 ring-offset-1',
           isCancelled && 'opacity-60',
           !isCancelled && 'cursor-move',
           isDraggingProp && 'transition-none',
+          hasConflict && !isDraggingProp
+            ? 'border-red-500 border-2'
+            : 'border-white/20',
+          hasConflict && !isDraggingProp && 'pl-6',
         )}
         style={{
           ...blockStyle,
@@ -110,6 +134,10 @@ export function ReservationBlock({
             : undefined,
           zIndex: isDraggingProp ? 20 : 5,
           pointerEvents: 'auto',
+          boxShadow:
+            hasConflict && !isDraggingProp
+              ? '0 0 8px rgba(239, 68, 68, 0.6), 0 1px 2px rgba(0,0,0,0.3)'
+              : undefined,
         }}
         onClick={(e) => {
           if (!isDraggingProp && !hasDragged && onSelect) {
@@ -137,6 +165,29 @@ export function ReservationBlock({
           }
         }}
       >
+        {hasConflict && !isDraggingProp && (
+          <div
+            className="absolute -left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 bg-red-500 rounded-full z-20 shadow-lg border-2 border-white"
+            title={getConflictMessage(conflictReason, table)}
+            onMouseEnter={(e) => {
+              if (!isDraggingProp) {
+                setTooltipPosition({
+                  x: e.clientX + 10,
+                  y: e.clientY + 10,
+                });
+                setShowConflictTooltip(true);
+                setShowTooltip(false);
+              }
+            }}
+            onMouseLeave={() => {
+              if (!isDraggingProp) {
+                setShowConflictTooltip(false);
+              }
+            }}
+          >
+            <span className="text-white text-xl font-bold leading-none">⚠</span>
+          </div>
+        )}
         <div className="font-semibold truncate leading-tight">
           {reservation.customer.name}
         </div>
@@ -174,77 +225,20 @@ export function ReservationBlock({
           </>
         )}
       </div>
-      {showTooltip && (
-        <Tooltip
+      {showTooltip && !showConflictTooltip && (
+        <ReservationTooltip
           initialPosition={tooltipPosition}
           reservation={reservation}
           timeRange={timeRange}
         />
       )}
+      {showConflictTooltip && hasConflict && (
+        <ConflictTooltip
+          initialPosition={tooltipPosition}
+          conflictReason={conflictReason}
+          table={table}
+        />
+      )}
     </>
-  );
-}
-
-function Tooltip({
-  initialPosition,
-  reservation,
-  timeRange,
-}: {
-  initialPosition: { x: number; y: number };
-  reservation: Reservation;
-  timeRange: string;
-}) {
-  const [position, setPosition] = useState(initialPosition);
-
-  useEffect(() => {
-    setPosition(initialPosition);
-    const handleMouseMove = (e: MouseEvent) => {
-      setPosition({ x: e.clientX + 10, y: e.clientY + 10 });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [initialPosition]);
-
-  return (
-    <div
-      className="fixed z-50 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none"
-      style={{
-        maxWidth: 250,
-        left: position.x,
-        top: position.y,
-      }}
-    >
-      <div className="font-bold mb-2">{reservation.customer.name}</div>
-      <div className="space-y-1">
-        <div>
-          <span className="opacity-70">Phone:</span>{' '}
-          {reservation.customer.phone}
-        </div>
-        {reservation.customer.email && (
-          <div>
-            <span className="opacity-70">Email:</span>{' '}
-            {reservation.customer.email}
-          </div>
-        )}
-        <div>
-          <span className="opacity-70">Party Size:</span>{' '}
-          {reservation.partySize} guests
-        </div>
-        <div>
-          <span className="opacity-70">Time:</span> {timeRange}
-        </div>
-        <div>
-          <span className="opacity-70">Status:</span> {reservation.status}
-        </div>
-        <div>
-          <span className="opacity-70">Priority:</span> {reservation.priority}
-        </div>
-        {reservation.notes && (
-          <div className="mt-2 pt-2 border-t border-gray-700">
-            <span className="opacity-70">Notes:</span> {reservation.notes}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

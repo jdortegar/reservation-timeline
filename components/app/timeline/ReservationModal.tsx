@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useStore } from '@/store/store';
@@ -8,6 +8,7 @@ import { addMinutes } from 'date-fns';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { checkAllConflicts } from '@/lib/helpers/conflicts';
 import { createReservationSchema } from '@/lib/validation/reservation';
+import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,12 @@ export function ReservationModal({
 }: ReservationModalProps) {
   const { tables, reservations, addReservation, updateReservation } = useStore();
   const reservation = reservationId ? reservations.find((r) => r.id === reservationId) : null;
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+  const [conflictReservation, setConflictReservation] = useState<Reservation | null>(null);
+  const [conflictTable, setConflictTable] = useState<typeof tables[0] | null>(null);
+  const [conflictReason, setConflictReason] = useState<
+    'overlap' | 'capacity_exceeded' | 'outside_service_hours' | undefined
+  >(undefined);
 
   const schema = createReservationSchema(tables);
   const {
@@ -150,25 +157,12 @@ export function ReservationModal({
     );
 
     if (conflict.hasConflict) {
-      if (conflict.reason === 'overlap') {
-        setError('startTime', {
-          type: 'manual',
-          message: 'This reservation overlaps with an existing reservation',
-        });
-        return;
-      } else if (conflict.reason === 'capacity_exceeded') {
-        setError('partySize', {
-          type: 'manual',
-          message: `Party size must be between ${selectedTable.capacity.min} and ${selectedTable.capacity.max}`,
-        });
-        return;
-      } else if (conflict.reason === 'outside_service_hours') {
-        setError('startTime', {
-          type: 'manual',
-          message: `Reservation must be between ${TIMELINE_CONFIG.START_HOUR}:00 and ${TIMELINE_CONFIG.END_HOUR}:00`,
-        });
-        return;
-      }
+      // Show conflict resolution dialog instead of just an error
+      setConflictReservation(reservationData);
+      setConflictTable(selectedTable);
+      setConflictReason(conflict.reason);
+      setShowConflictDialog(true);
+      return;
     }
 
     if (reservationId) {
@@ -180,16 +174,44 @@ export function ReservationModal({
     onClose();
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {reservationId ? 'Edit Reservation' : 'Create Reservation'}
-          </DialogTitle>
-        </DialogHeader>
+  const handleConflictResolve = (resolvedReservation: Reservation) => {
+    if (reservationId) {
+      updateReservation(reservationId, resolvedReservation);
+    } else {
+      addReservation(resolvedReservation);
+    }
+    setShowConflictDialog(false);
+    setConflictReservation(null);
+    setConflictTable(null);
+    setConflictReason(undefined);
+    onClose();
+  };
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+  const handleConflictOverride = () => {
+    if (!conflictReservation) return;
+    if (reservationId) {
+      updateReservation(reservationId, conflictReservation);
+    } else {
+      addReservation(conflictReservation);
+    }
+    setShowConflictDialog(false);
+    setConflictReservation(null);
+    setConflictTable(null);
+    setConflictReason(undefined);
+    onClose();
+  };
+
+  return (
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {reservationId ? 'Edit Reservation' : 'Create Reservation'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="customerName">
@@ -371,7 +393,27 @@ export function ReservationModal({
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {showConflictDialog && conflictReservation && conflictTable && (
+        <ConflictResolutionDialog
+          allReservations={reservations.filter((r) => r.id !== reservationId)}
+          allTables={tables}
+          conflictReason={conflictReason}
+          currentTable={conflictTable}
+          isOpen={showConflictDialog}
+          onClose={() => {
+            setShowConflictDialog(false);
+            setConflictReservation(null);
+            setConflictTable(null);
+            setConflictReason(undefined);
+          }}
+          onOverride={handleConflictOverride}
+          onResolve={handleConflictResolve}
+          reservation={conflictReservation}
+        />
+      )}
+    </>
   );
 }

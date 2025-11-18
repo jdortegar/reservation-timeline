@@ -1,4 +1,8 @@
-import type { Reservation, ConflictCheck, Table } from '@/lib/types/Reservation';
+import type {
+  Reservation,
+  ConflictCheck,
+  Table,
+} from '@/lib/types/Reservation';
 import { parseISO, isBefore, isAfter } from 'date-fns';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 
@@ -38,10 +42,7 @@ export function checkOverlap(
   };
 }
 
-export function checkCapacity(
-  partySize: number,
-  table: Table,
-): ConflictCheck {
+export function checkCapacity(partySize: number, table: Table): ConflictCheck {
   const exceedsCapacity =
     partySize < table.capacity.min || partySize > table.capacity.max;
 
@@ -58,12 +59,19 @@ export function checkServiceHours(
 ): ConflictCheck {
   const start = parseISO(startTime);
   const end = parseISO(endTime);
-  const startHour = start.getHours();
-  const endHour = end.getHours() === 0 ? 24 : end.getHours();
 
+  // Convert to hours with minutes as decimal (e.g., 11:30 = 11.5)
+  const startHourDecimal = start.getHours() + start.getMinutes() / 60;
+  const endHourDecimal =
+    end.getHours() === 0 && end.getMinutes() === 0
+      ? 24 // Midnight (00:00) = 24:00
+      : end.getHours() + end.getMinutes() / 60;
+
+  // Check if reservation is outside service hours
+  // Service hours: START_HOUR:00 to END_HOUR:00
   const outsideHours =
-    startHour < TIMELINE_CONFIG.START_HOUR ||
-    endHour > TIMELINE_CONFIG.END_HOUR;
+    startHourDecimal < TIMELINE_CONFIG.START_HOUR ||
+    endHourDecimal > TIMELINE_CONFIG.END_HOUR;
 
   return {
     hasConflict: outsideHours,
@@ -100,3 +108,20 @@ export function checkAllConflicts(
   };
 }
 
+export function getConflictMessage(
+  reason: 'overlap' | 'capacity_exceeded' | 'outside_service_hours' | undefined,
+  table?: Table,
+): string {
+  switch (reason) {
+    case 'overlap':
+      return 'This reservation overlaps with another reservation on the same table';
+    case 'capacity_exceeded':
+      return table
+        ? `Party size must be between ${table.capacity.min} and ${table.capacity.max} guests`
+        : 'Party size exceeds table capacity';
+    case 'outside_service_hours':
+      return 'Reservation is outside service hours';
+    default:
+      return 'Conflict detected';
+  }
+}
