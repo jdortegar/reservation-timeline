@@ -1,15 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useStore } from '@/store/store';
-import { getTimeSlots } from '@/lib/helpers/time';
+import { getTimeSlots, timeToSlotIndex } from '@/lib/helpers/time';
 import { slotToX, durationToWidth } from '@/lib/helpers/coordinates';
-import { timeToSlotIndex } from '@/lib/helpers/time';
 import { parseISO } from 'date-fns';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineRow } from './TimelineRow';
 import { ReservationBlock } from './ReservationBlock';
+import { ReservationGhostBlock } from './ReservationGhostBlock';
+import { DropPreviewBlock } from './DropPreviewBlock';
 import { CreateDragArea } from './CreateDragArea';
+import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
+import { useReservationDrag } from '@/lib/hooks/useReservationDrag';
 import type { Reservation, Sector } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
@@ -47,6 +50,7 @@ function SectorHeader({
 }
 
 export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
+  const gridContainerRef = useRef<HTMLDivElement>(null);
   const {
     config,
     zoom,
@@ -55,6 +59,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     sectors,
     collapsedSectors,
     selectedReservationIds,
+    updateReservation,
   } = useStore();
 
   const timeSlots = useMemo(() => getTimeSlots(config.date), [config.date]);
@@ -126,6 +131,19 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     });
   }, [groupedTables, collapsedSectors]);
 
+  // Use custom hook for drag logic (after groupedTables and visibleTables are defined)
+  const { draggingReservation, ghostPreview, dropPreview, handleDragStart } =
+    useReservationDrag({
+      collapsedSectors,
+      configDate: config.date,
+      gridContainerRef,
+      groupedTables,
+      onUpdateReservation: updateReservation,
+      reservations,
+      visibleTables,
+      zoom,
+    });
+
   const gridWidth = timeSlots.length * 60 * zoom;
   const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
 
@@ -133,7 +151,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     currentTimeSlot >= 0 ? slotToX(currentTimeSlot, zoom) : null;
 
   return (
-    <div className="h-full overflow-auto relative">
+    <div ref={gridContainerRef} className="h-full overflow-auto relative">
       <div
         style={{ width: gridWidth, height: gridHeight, position: 'relative' }}
       >
@@ -214,11 +232,20 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                           reservation.id,
                         );
 
+                        const isDragging =
+                          draggingReservation?.reservation.id ===
+                          reservation.id;
+
                         return (
                           <ReservationBlock
                             key={reservation.id}
-                            reservation={reservation}
+                            configDate={config.date}
+                            gridContainerRef={gridContainerRef}
+                            isDragging={isDragging}
                             isSelected={isSelected}
+                            onDragStart={(e) => {
+                              handleDragStart(reservation, e, x, absoluteIndex);
+                            }}
                             onSelect={(e) => {
                               const { selectReservation } = useStore.getState();
                               selectReservation(
@@ -226,6 +253,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                                 e.metaKey || e.ctrlKey,
                               );
                             }}
+                            reservation={reservation}
                             style={{
                               position: 'absolute',
                               left: x,
@@ -233,6 +261,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                               width,
                               height: 60,
                             }}
+                            tableIndex={absoluteIndex}
+                            visibleTables={visibleTables}
+                            zoom={zoom}
                           />
                         );
                       })}
@@ -243,6 +274,38 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
             );
           })}
         </div>
+        {/* Ghost Preview - follows cursor exactly */}
+        {ghostPreview && draggingReservation && (
+          <ReservationGhostBlock
+            configDate={config.date}
+            height={ghostPreview.height}
+            left={ghostPreview.left}
+            originalTableIndex={draggingReservation.originalTableIndex}
+            reservation={draggingReservation.reservation}
+            slotIndex={ghostPreview.slotIndex}
+            tableIndex={ghostPreview.tableIndex}
+            top={ghostPreview.top}
+            visibleTables={visibleTables}
+            width={ghostPreview.width}
+          />
+        )}
+        {/* Drop Preview - shows snapped drop position */}
+        {dropPreview && draggingReservation && (
+          <DropPreviewBlock
+            configDate={config.date}
+            conflictReason={dropPreview.conflictReason}
+            hasConflict={dropPreview.hasConflict}
+            height={dropPreview.height}
+            left={dropPreview.left}
+            originalTableIndex={draggingReservation.originalTableIndex}
+            reservation={draggingReservation.reservation}
+            slotIndex={dropPreview.slotIndex}
+            tableIndex={dropPreview.tableIndex}
+            top={dropPreview.top}
+            visibleTables={visibleTables}
+            width={dropPreview.width}
+          />
+        )}
       </div>
     </div>
   );

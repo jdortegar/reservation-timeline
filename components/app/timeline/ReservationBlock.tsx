@@ -1,26 +1,43 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import { formatTimeRange } from '@/lib/helpers/time';
 import { parseISO } from 'date-fns';
-import type { Reservation } from '@/lib/types/Reservation';
+import type { Reservation, Table } from '@/lib/types/Reservation';
 import clsx from 'clsx';
 
 interface ReservationBlockProps {
   reservation: Reservation;
   style?: React.CSSProperties;
   isSelected?: boolean;
+  isDragging?: boolean;
   onSelect?: (e: React.MouseEvent) => void;
+  onDragStart?: (e: React.MouseEvent) => void;
+  configDate: string;
+  zoom: number;
+  tableIndex: number;
+  visibleTables: Table[];
+  gridContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function ReservationBlock({
   reservation,
   style,
   isSelected,
+  isDragging: isDraggingProp = false,
   onSelect,
+  onDragStart,
+  configDate,
+  zoom,
+  tableIndex,
+  visibleTables,
+  gridContainerRef,
 }: ReservationBlockProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const [hasDragged, setHasDragged] = useState(false);
+  const blockRef = useRef<HTMLDivElement>(null);
   const backgroundColor =
     RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF';
   const startTime = parseISO(reservation.startTime);
@@ -28,27 +45,68 @@ export function ReservationBlock({
   const timeRange = formatTimeRange(startTime, endTime);
   const isCancelled = reservation.status === 'CANCELLED';
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    if (isCancelled) return;
+    if (onDragStart) {
+      onDragStart(e);
+    }
+    setHasDragged(false);
+    setShowTooltip(false);
+  };
+
+  const blockStyle = isDraggingProp
+    ? {
+        ...style,
+        pointerEvents: 'none' as const,
+        opacity: 0.5,
+        userSelect: 'none' as const,
+        zIndex: 5,
+        transform: 'none',
+        transition: 'none',
+      }
+    : style;
+
   return (
     <>
       <div
+        ref={blockRef}
         data-reservation-block
         className={clsx(
-          'absolute cursor-pointer rounded px-2 py-1 text-white text-xs shadow-lg border border-white/20 transition-all',
+          'absolute rounded px-2 py-1 text-white text-xs shadow-lg border border-white/20',
+          !isDraggingProp && 'transition-all',
           isSelected && 'ring-2 ring-blue-500 ring-offset-1',
           isCancelled && 'opacity-60',
+          !isCancelled && 'cursor-move',
+          isDraggingProp && 'transition-none',
         )}
         style={{
-          ...style,
+          ...blockStyle,
           backgroundColor: isCancelled ? '#9CA3AF' : backgroundColor,
           textShadow: '0 1px 2px rgba(0,0,0,0.3)',
           backgroundImage: isCancelled
             ? 'repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px)'
             : undefined,
-          zIndex: 5,
+          zIndex: isDraggingProp ? 20 : 5,
         }}
-        onClick={onSelect}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
+        onClick={(e) => {
+          if (!isDraggingProp && !hasDragged && onSelect) {
+            onSelect(e);
+          }
+          setHasDragged(false);
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseEnter={(e) => {
+          if (!isDraggingProp) {
+            setTooltipPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+            setShowTooltip(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (!isDraggingProp) {
+            setShowTooltip(false);
+          }
+        }}
       >
         <div className="font-semibold truncate leading-tight">
           {reservation.customer.name}
@@ -66,28 +124,35 @@ export function ReservationBlock({
         )}
       </div>
       {showTooltip && (
-        <Tooltip reservation={reservation} timeRange={timeRange} />
+        <Tooltip
+          initialPosition={tooltipPosition}
+          reservation={reservation}
+          timeRange={timeRange}
+        />
       )}
     </>
   );
 }
 
 function Tooltip({
+  initialPosition,
   reservation,
   timeRange,
 }: {
+  initialPosition: { x: number; y: number };
   reservation: Reservation;
   timeRange: string;
 }) {
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [position, setPosition] = useState(initialPosition);
 
   useEffect(() => {
+    setPosition(initialPosition);
     const handleMouseMove = (e: MouseEvent) => {
       setPosition({ x: e.clientX + 10, y: e.clientY + 10 });
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
+  }, [initialPosition]);
 
   return (
     <div
