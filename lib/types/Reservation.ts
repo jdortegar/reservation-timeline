@@ -60,6 +60,7 @@ export interface TimelineConfig {
   endHour: number;
   slotMinutes: Minutes;
   viewMode: 'day' | '3-day' | 'week';
+  timezone?: string; // IANA timezone identifier (e.g., 'America/New_York', 'Europe/London')
 }
 
 export interface ConflictCheck {
@@ -67,4 +68,3 @@ export interface ConflictCheck {
   conflictingReservationIds: UUID[];
   reason?: 'overlap' | 'capacity_exceeded' | 'outside_service_hours';
 }
-

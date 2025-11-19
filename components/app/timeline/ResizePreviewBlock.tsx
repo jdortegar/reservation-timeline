@@ -15,6 +15,7 @@ interface ResizePreviewBlockProps {
   endSlotIndex: number;
   newDurationMinutes: number;
   configDate: string;
+  configTimezone?: string;
   hasConflict: boolean;
 }
 
@@ -28,13 +29,14 @@ export function ResizePreviewBlock({
   endSlotIndex,
   newDurationMinutes,
   configDate,
+  configTimezone,
   hasConflict,
 }: ResizePreviewBlockProps) {
   const backgroundColor =
     RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF';
-  const startTime = slotIndexToTime(startSlotIndex, configDate);
-  const endTime = slotIndexToTime(endSlotIndex, configDate);
-  const timeRange = formatTimeRange(startTime, endTime);
+  const startTime = slotIndexToTime(startSlotIndex, configDate, configTimezone);
+  const endTime = slotIndexToTime(endSlotIndex, configDate, configTimezone);
+  const timeRange = formatTimeRange(startTime, endTime, configTimezone);
 
   // Format duration
   const hours = Math.floor(newDurationMinutes / 60);

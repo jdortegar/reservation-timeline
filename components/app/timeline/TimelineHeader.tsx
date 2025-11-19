@@ -6,9 +6,14 @@ import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 interface TimelineHeaderProps {
   timeSlots: Date[];
   zoom: number;
+  timezone?: string;
 }
 
-export function TimelineHeader({ timeSlots, zoom }: TimelineHeaderProps) {
+export function TimelineHeader({
+  timeSlots,
+  zoom,
+  timezone,
+}: TimelineHeaderProps) {
   const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
 
   return (
@@ -61,7 +66,7 @@ export function TimelineHeader({ timeSlots, zoom }: TimelineHeaderProps) {
               >
                 {isHour && (
                   <span className={isMidnight ? 'font-bold text-gray-900' : ''}>
-                    {formatTimeSlot(slot)}
+                    {formatTimeSlot(slot, timezone)}
                   </span>
                 )}
               </div>

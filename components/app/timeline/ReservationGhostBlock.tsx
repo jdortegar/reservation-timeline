@@ -15,6 +15,7 @@ interface ReservationGhostBlockProps {
   tableIndex: number;
   originalTableIndex: number;
   configDate: string;
+  configTimezone?: string;
   visibleTables: Table[];
 }
 
@@ -28,6 +29,7 @@ export function ReservationGhostBlock({
   tableIndex,
   originalTableIndex,
   configDate,
+  configTimezone,
   visibleTables,
 }: ReservationGhostBlockProps) {
   const backgroundColor =
@@ -59,21 +61,20 @@ export function ReservationGhostBlock({
         <span>•</span>
         <span>
           {formatTimeRange(
-            slotIndexToTime(slotIndex, configDate),
+            slotIndexToTime(slotIndex, configDate, configTimezone),
             addMinutes(
-              slotIndexToTime(slotIndex, configDate),
+              slotIndexToTime(slotIndex, configDate, configTimezone),
               reservation.durationMinutes,
             ),
+            configTimezone,
           )}
         </span>
       </div>
-      {visibleTables[tableIndex] &&
-        tableIndex !== originalTableIndex && (
-          <div className="text-xs opacity-95 leading-tight mt-0.5 text-white">
-            → {visibleTables[tableIndex].name}
-          </div>
-        )}
+      {visibleTables[tableIndex] && tableIndex !== originalTableIndex && (
+        <div className="text-xs opacity-95 leading-tight mt-0.5 text-white">
+          → {visibleTables[tableIndex].name}
+        </div>
+      )}
     </div>
   );
 }
-

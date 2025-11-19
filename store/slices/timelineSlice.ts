@@ -50,6 +50,7 @@ export const createTimelineSlice: StateCreator<TimelineState> = (set) => ({
     endHour: 24,
     slotMinutes: 15,
     viewMode: 'day',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to browser's timezone
   },
   sectors: [],
   tables: [],

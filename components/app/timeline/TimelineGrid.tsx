@@ -109,7 +109,10 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     redo,
   } = useStore();
 
-  const timeSlots = useMemo(() => getTimeSlots(config.date), [config.date]);
+  const timeSlots = useMemo(
+    () => getTimeSlots(config.date, config.timezone),
+    [config.date, config.timezone],
+  );
 
   // Apply filters to reservations
   const filteredReservations = useMemo(() => {
@@ -265,6 +268,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     useReservationDrag({
       collapsedSectors,
       configDate: config.date,
+      configTimezone: config.timezone,
       gridContainerRef,
       groupedTables,
       onUpdateReservation: updateReservation,
@@ -279,6 +283,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     useReservationResize({
       collapsedSectors,
       configDate: config.date,
+      configTimezone: config.timezone,
       gridContainerRef,
       groupedTables,
       onUpdateReservation: updateReservation,
@@ -418,7 +423,11 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       <div
         style={{ width: gridWidth, height: gridHeight, position: 'relative' }}
       >
-        <TimelineHeader timeSlots={timeSlots} zoom={zoom} />
+        <TimelineHeader
+          timeSlots={timeSlots}
+          timezone={config.timezone}
+          zoom={zoom}
+        />
         {currentTimeX !== null && contentHeight > 0 && (
           <div
             className="absolute z-20 pointer-events-none"
@@ -479,6 +488,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                     >
                       <CreateDragArea
                         configDate={config.date}
+                        configTimezone={config.timezone}
                         defaultPartySize={2}
                         isDragActive={!!draggingReservation}
                         isResizeActive={!!resizingReservation}
@@ -519,6 +529,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                             key={reservation.id}
                             allReservations={reservations}
                             configDate={config.date}
+                            configTimezone={config.timezone}
                             gridContainerRef={gridContainerRef}
                             isDragging={isDragging}
                             isSelected={isSelected}
@@ -569,6 +580,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
         {ghostPreview && draggingReservation && (
           <ReservationGhostBlock
             configDate={config.date}
+            configTimezone={config.timezone}
             height={ghostPreview.height}
             left={ghostPreview.left}
             originalTableIndex={draggingReservation.originalTableIndex}
@@ -601,6 +613,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
         {resizePreview && resizingReservation && (
           <ResizePreviewBlock
             configDate={config.date}
+            configTimezone={config.timezone}
             endSlotIndex={resizePreview.endSlotIndex}
             hasConflict={resizePreview.hasConflict}
             height={60}

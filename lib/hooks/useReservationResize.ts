@@ -11,6 +11,7 @@ interface UseReservationResizeProps {
   gridContainerRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   configDate: string;
+  configTimezone?: string;
   visibleTables: Table[];
   reservations: Reservation[];
   groupedTables: Array<{
@@ -58,6 +59,7 @@ export function useReservationResize({
   gridContainerRef,
   zoom,
   configDate,
+  configTimezone,
   visibleTables,
   reservations,
   groupedTables,
@@ -152,6 +154,7 @@ export function useReservationResize({
         const originalStartSlot = timeToSlotIndex(
           resizingReservation.originalStartTime,
           configDate,
+          configTimezone,
         );
         const newDurationSlots = newRightEdgeSlot - originalStartSlot;
         const clampedDurationSlots = Math.max(
@@ -171,12 +174,13 @@ export function useReservationResize({
         // Snap to slot boundaries
         const newStartSlot = xToSlot(newLeft, zoom);
         newLeft = slotToX(newStartSlot, zoom);
-        newStartTime = slotIndexToTime(newStartSlot, configDate);
+        newStartTime = slotIndexToTime(newStartSlot, configDate, configTimezone);
 
         // Calculate new duration (keep end time, adjust start)
         const originalEndSlot = timeToSlotIndex(
           resizingReservation.originalEndTime,
           configDate,
+          configTimezone,
         );
         const newDurationSlots = Math.max(
           minDurationSlots,
@@ -289,6 +293,7 @@ export function useReservationResize({
           updates.endTime = slotIndexToTime(
             resizePreview.endSlotIndex,
             configDate,
+            configTimezone,
           ).toISOString();
           updates.durationMinutes = resizePreview.newDurationMinutes;
         } else {
@@ -296,10 +301,12 @@ export function useReservationResize({
           updates.startTime = slotIndexToTime(
             resizePreview.startSlotIndex,
             configDate,
+            configTimezone,
           ).toISOString();
           updates.endTime = slotIndexToTime(
             resizePreview.endSlotIndex,
             configDate,
+            configTimezone,
           ).toISOString();
           updates.durationMinutes = resizePreview.newDurationMinutes;
         }

@@ -19,6 +19,7 @@ interface ReservationBlockProps {
   onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
   onContextMenu?: (e: React.MouseEvent, reservation: Reservation) => void;
   configDate: string;
+  configTimezone?: string;
   zoom: number;
   tableIndex: number;
   visibleTables: Table[];
@@ -37,6 +38,7 @@ export function ReservationBlock({
   onResizeStart,
   onContextMenu,
   configDate,
+  configTimezone,
   zoom,
   tableIndex,
   visibleTables,
@@ -53,7 +55,7 @@ export function ReservationBlock({
     RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF';
   const startTime = parseISO(reservation.startTime);
   const endTime = parseISO(reservation.endTime);
-  const timeRange = formatTimeRange(startTime, endTime);
+  const timeRange = formatTimeRange(startTime, endTime, configTimezone);
   const isCancelled = reservation.status === 'CANCELLED';
 
   // Check for conflicts

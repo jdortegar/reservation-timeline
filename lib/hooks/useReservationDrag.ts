@@ -16,6 +16,7 @@ interface UseReservationDragProps {
   gridContainerRef: RefObject<HTMLDivElement | null>;
   zoom: number;
   configDate: string;
+  configTimezone?: string;
   visibleTables: Table[];
   groupedTables: Array<{
     sector: Sector | null;
@@ -68,6 +69,7 @@ export function useReservationDrag({
   gridContainerRef,
   zoom,
   configDate,
+  configTimezone,
   visibleTables,
   groupedTables,
   collapsedSectors,
@@ -174,6 +176,7 @@ export function useReservationDrag({
       let dropSlotIndex = timeToSlotIndex(
         parseISO(draggingReservation.reservation.startTime),
         configDate,
+        configTimezone,
       );
       let dropTableIndex = draggingReservation.originalTableIndex;
 
@@ -277,7 +280,11 @@ export function useReservationDrag({
 
       // Check for conflicts at the drop position
       const dropTable = visibleTables[dropTableIndex];
-      const dropStartTime = slotIndexToTime(dropSlotIndex, configDate);
+      const dropStartTime = slotIndexToTime(
+        dropSlotIndex,
+        configDate,
+        configTimezone,
+      );
       const dropEndTime = addMinutes(
         dropStartTime,
         draggingReservation.reservation.durationMinutes,
@@ -352,6 +359,7 @@ export function useReservationDrag({
       const originalSlot = timeToSlotIndex(
         parseISO(draggingReservation.reservation.startTime),
         configDate,
+        configTimezone,
       );
       const slotDiff = newSlot - originalSlot;
       const tableDiff = newTableIndex - draggingReservation.originalTableIndex;
@@ -383,7 +391,7 @@ export function useReservationDrag({
       let newTable: Table | null = null;
 
       if (hasHorizontalMovement && Math.abs(slotDiff) <= 200) {
-        newStartTime = slotIndexToTime(newSlot, configDate);
+        newStartTime = slotIndexToTime(newSlot, configDate, configTimezone);
         newEndTime = addMinutes(
           newStartTime,
           draggingReservation.reservation.durationMinutes,

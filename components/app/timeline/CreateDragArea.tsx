@@ -2,7 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { addMinutes } from 'date-fns';
-import { slotIndexToTime, minutesToSlots, slotsToMinutes } from '@/lib/helpers/time';
+import {
+  slotIndexToTime,
+  minutesToSlots,
+  slotsToMinutes,
+} from '@/lib/helpers/time';
 import { slotToX, xToSlot, durationToWidth } from '@/lib/helpers/coordinates';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { checkAllConflicts } from '@/lib/helpers/conflicts';
@@ -13,7 +17,12 @@ interface CreateDragAreaProps {
   timeSlots: Date[];
   zoom: number;
   configDate: string;
-  onDragComplete: (tableId: string, startTime: string, duration: number) => void;
+  configTimezone?: string;
+  onDragComplete: (
+    tableId: string,
+    startTime: string,
+    duration: number,
+  ) => void;
   isDragActive?: boolean;
   isResizeActive?: boolean;
   reservations?: Reservation[];
@@ -25,6 +34,7 @@ export function CreateDragArea({
   timeSlots,
   zoom,
   configDate,
+  configTimezone,
   onDragComplete,
   isDragActive = false,
   isResizeActive = false,
@@ -34,7 +44,9 @@ export function CreateDragArea({
   const [isDragging, setIsDragging] = useState(false);
   const [startSlot, setStartSlot] = useState<number | null>(null);
   const [endSlot, setEndSlot] = useState<number | null>(null);
-  const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [hasConflict, setHasConflict] = useState(false);
   const [conflictReason, setConflictReason] = useState<
     'overlap' | 'capacity_exceeded' | 'outside_service_hours' | undefined
@@ -43,7 +55,7 @@ export function CreateDragArea({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    
+
     // Don't start create drag if:
     // - A drag or resize is already active
     // - Clicking on reservation blocks
@@ -51,7 +63,7 @@ export function CreateDragArea({
     if (isDragActive || isResizeActive) {
       return;
     }
-    
+
     const target = e.target as HTMLElement;
     if (
       target.closest('[data-reservation-block]') ||
@@ -74,14 +86,14 @@ export function CreateDragArea({
     setEndSlot(snappedSlot);
   };
 
-
   useEffect(() => {
     if (!isDragging) return;
 
     const handleMove = (e: MouseEvent) => {
       if (startSlot === null || !startPos) return;
-      
-      const dragDistance = Math.abs(e.clientX - startPos.x) + Math.abs(e.clientY - startPos.y);
+
+      const dragDistance =
+        Math.abs(e.clientX - startPos.x) + Math.abs(e.clientY - startPos.y);
       if (dragDistance < 5) return;
 
       const rect = areaRef.current?.getBoundingClientRect();
@@ -95,7 +107,7 @@ export function CreateDragArea({
       const minSlots = minutesToSlots(TIMELINE_CONFIG.MIN_DURATION_MINUTES);
       const slots = Math.max(minSlots, snappedSlot - startSlot + 1);
       const duration = slotsToMinutes(slots);
-      const startTime = slotIndexToTime(startSlot, configDate);
+      const startTime = slotIndexToTime(startSlot, configDate, configTimezone);
       const endTime = addMinutes(startTime, duration);
 
       // Create temporary reservation for conflict check
@@ -140,7 +152,7 @@ export function CreateDragArea({
       const minSlots = minutesToSlots(TIMELINE_CONFIG.MIN_DURATION_MINUTES);
       const slots = Math.max(minSlots, endSlot - startSlot + 1);
       const duration = slotsToMinutes(slots);
-      const startTime = slotIndexToTime(startSlot, configDate);
+      const startTime = slotIndexToTime(startSlot, configDate, configTimezone);
 
       // Only complete if no conflict
       if (duration >= TIMELINE_CONFIG.MIN_DURATION_MINUTES && !hasConflict) {
@@ -161,7 +173,16 @@ export function CreateDragArea({
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
     };
-  }, [isDragging, startSlot, endSlot, startPos, zoom, configDate, table.id, onDragComplete]);
+  }, [
+    isDragging,
+    startSlot,
+    endSlot,
+    startPos,
+    zoom,
+    configDate,
+    table.id,
+    onDragComplete,
+  ]);
 
   const previewWidth =
     startSlot !== null && endSlot !== null
@@ -197,4 +218,3 @@ export function CreateDragArea({
     </>
   );
 }
-
