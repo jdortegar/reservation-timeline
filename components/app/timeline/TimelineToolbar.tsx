@@ -27,6 +27,7 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  Upload,
 } from 'lucide-react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import type { ReservationStatus } from '@/lib/types/Reservation';
@@ -40,7 +41,11 @@ const ZOOM_LABELS: Record<number, string> = {
   1.5: '150%',
 };
 
-export function TimelineToolbar() {
+interface TimelineToolbarProps {
+  onImportCSV?: () => void;
+}
+
+export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
   const {
     config,
     sectors,
@@ -158,7 +163,7 @@ export function TimelineToolbar() {
   return (
     <div className="border-b bg-white sticky top-0 z-30 shadow-sm">
       <div className="px-4 py-3">
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           {/* Date Picker */}
           <div className="flex items-center gap-2">
             <Button
@@ -321,53 +326,6 @@ export function TimelineToolbar() {
             )}
           </div>
 
-          {/* Zoom Controls */}
-          <div className="flex items-center gap-1">
-            <Button
-              onClick={() => {
-                const currentIndex = ZOOM_LEVELS.indexOf(zoom);
-                if (currentIndex > 0) {
-                  setZoom(ZOOM_LEVELS[currentIndex - 1]);
-                }
-              }}
-              size="sm"
-              variant="outline"
-              disabled={zoom === ZOOM_LEVELS[0]}
-              aria-label="Zoom out"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Select
-              value={zoom.toString()}
-              onValueChange={(value) => setZoom(parseFloat(value))}
-            >
-              <SelectTrigger className="w-[80px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ZOOM_LEVELS.map((level) => (
-                  <SelectItem key={level} value={level.toString()}>
-                    {ZOOM_LABELS[level]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={() => {
-                const currentIndex = ZOOM_LEVELS.indexOf(zoom);
-                if (currentIndex < ZOOM_LEVELS.length - 1) {
-                  setZoom(ZOOM_LEVELS[currentIndex + 1]);
-                }
-              }}
-              size="sm"
-              variant="outline"
-              disabled={zoom === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
-              aria-label="Zoom in"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-          </div>
-
           {/* Active Filters Indicator */}
           {activeFilterCount > 0 && (
             <div className="flex items-center gap-2">
@@ -384,6 +342,69 @@ export function TimelineToolbar() {
               </Button>
             </div>
           )}
+
+          {/* Right side: Zoom and Import */}
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={() => {
+                  const currentIndex = ZOOM_LEVELS.indexOf(zoom);
+                  if (currentIndex > 0) {
+                    setZoom(ZOOM_LEVELS[currentIndex - 1]);
+                  }
+                }}
+                size="sm"
+                variant="outline"
+                disabled={zoom === ZOOM_LEVELS[0]}
+                aria-label="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Select
+                value={zoom.toString()}
+                onValueChange={(value) => setZoom(parseFloat(value))}
+              >
+                <SelectTrigger className="w-[80px] h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ZOOM_LEVELS.map((level) => (
+                    <SelectItem key={level} value={level.toString()}>
+                      {ZOOM_LABELS[level]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={() => {
+                  const currentIndex = ZOOM_LEVELS.indexOf(zoom);
+                  if (currentIndex < ZOOM_LEVELS.length - 1) {
+                    setZoom(ZOOM_LEVELS[currentIndex + 1]);
+                  }
+                }}
+                size="sm"
+                variant="outline"
+                disabled={zoom === ZOOM_LEVELS[ZOOM_LEVELS.length - 1]}
+                aria-label="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Import CSV Button */}
+            {onImportCSV && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onImportCSV}
+                title="Import reservations from CSV"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>

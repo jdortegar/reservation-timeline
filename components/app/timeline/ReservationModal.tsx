@@ -760,7 +760,9 @@ export function ReservationModal({
                       // Close the calendar popup by blurring the input after a short delay
                       // This allows the value to be set first
                       setTimeout(() => {
-                        const input = document.getElementById('startTime') as HTMLInputElement;
+                        const input = document.getElementById(
+                          'startTime',
+                        ) as HTMLInputElement;
                         if (input) {
                           input.blur();
                         }
@@ -769,7 +771,9 @@ export function ReservationModal({
                   })}
                   onBlur={() => {
                     // Ensure calendar closes on blur
-                    const input = document.getElementById('startTime') as HTMLInputElement;
+                    const input = document.getElementById(
+                      'startTime',
+                    ) as HTMLInputElement;
                     if (input) {
                       input.blur();
                     }

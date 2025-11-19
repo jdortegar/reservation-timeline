@@ -7,6 +7,7 @@ import { useStore } from '@/store/store';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineToolbar } from './TimelineToolbar';
 import { ReservationModal } from './ReservationModal';
+import { CSVImportModal } from './CSVImportModal';
 import type { Sector, Table, Reservation } from '@/lib/types/Reservation';
 
 const SEED_SECTORS: Sector[] = [
@@ -172,6 +173,7 @@ export function TimelineView() {
     duration?: number;
     reservationId?: string;
   }>({ isOpen: false });
+  const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
 
   useEffect(() => {
     // Only run on client to avoid hydration mismatch
@@ -212,7 +214,7 @@ export function TimelineView() {
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="flex flex-col h-full">
-        <TimelineToolbar />
+        <TimelineToolbar onImportCSV={() => setIsCSVImportOpen(true)} />
         <div className="flex-1 overflow-hidden">
           <TimelineGrid
             onOpenModal={(tableId, startTime, duration, reservationId) => {
@@ -234,6 +236,10 @@ export function TimelineView() {
         initialStartTime={modalState.startTime}
         initialDuration={modalState.duration}
         reservationId={modalState.reservationId}
+      />
+      <CSVImportModal
+        isOpen={isCSVImportOpen}
+        onClose={() => setIsCSVImportOpen(false)}
       />
     </DndProvider>
   );
