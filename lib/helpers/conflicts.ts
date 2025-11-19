@@ -60,15 +60,23 @@ export function checkServiceHours(
   const start = parseISO(startTime);
   const end = parseISO(endTime);
 
-  // Convert to hours with minutes as decimal (e.g., 11:30 = 11.5)
-  const startHourDecimal = start.getHours() + start.getMinutes() / 60;
+  // Extract date components from ISO strings to get the actual date
+  // ISO strings are in UTC, but we need to check the local time of the reservation
+  // Since reservations are created in local time and converted to ISO, we need to
+  // extract the date part and reconstruct the time in local timezone
+  const startDate = new Date(startTime);
+  const endDate = new Date(endTime);
+
+  // Use local hours since reservations are created in local time
+  // The ISO string represents the same moment, but we need the local time components
+  const startHourDecimal = startDate.getHours() + startDate.getMinutes() / 60;
   const endHourDecimal =
-    end.getHours() === 0 && end.getMinutes() === 0
+    endDate.getHours() === 0 && endDate.getMinutes() === 0
       ? 24 // Midnight (00:00) = 24:00
-      : end.getHours() + end.getMinutes() / 60;
+      : endDate.getHours() + endDate.getMinutes() / 60;
 
   // Check if reservation is outside service hours
-  // Service hours: START_HOUR:00 to END_HOUR:00
+  // Service hours: START_HOUR:00 to END_HOUR:00 (11:00 to 00:00)
   const outsideHours =
     startHourDecimal < TIMELINE_CONFIG.START_HOUR ||
     endHourDecimal > TIMELINE_CONFIG.END_HOUR;

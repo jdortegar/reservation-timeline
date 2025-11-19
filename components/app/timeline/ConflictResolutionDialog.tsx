@@ -128,18 +128,25 @@ export function ConflictResolutionDialog({
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{alt.table.name}</span>
                         {!alt.hasConflict && (
-                          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-50 text-green-700 border-green-200"
+                          >
                             Available
                           </Badge>
                         )}
                         {alt.hasConflict && (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          <Badge
+                            variant="outline"
+                            className="bg-red-50 text-red-700 border-red-200"
+                          >
                             Has Conflict
                           </Badge>
                         )}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        Capacity: {alt.table.capacity.min} - {alt.table.capacity.max} guests
+                        Capacity: {alt.table.capacity.min} -{' '}
+                        {alt.table.capacity.max} guests
                       </div>
                     </div>
                     {!alt.hasConflict && (
@@ -185,12 +192,18 @@ export function ConflictResolutionDialog({
                             ({offsetLabel})
                           </span>
                           {!alt.hasConflict && (
-                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-200"
+                            >
                               Available
                             </Badge>
                           )}
                           {alt.hasConflict && (
-                            <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                            <Badge
+                              variant="outline"
+                              className="bg-red-50 text-red-700 border-red-200"
+                            >
                               Has Conflict
                             </Badge>
                           )}
@@ -221,40 +234,58 @@ export function ConflictResolutionDialog({
               </div>
             )}
 
-          {/* Manual Override */}
-          <div className="border-t pt-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold mb-1">Manual Override</h3>
-                <p className="text-xs text-gray-500">
-                  {showOverrideConfirm
-                    ? 'Are you sure you want to proceed with this reservation despite the conflict?'
-                    : 'Proceed with the reservation despite the conflict.'}
-                </p>
-              </div>
-              <div className="flex gap-2 ml-4">
-                {showOverrideConfirm && (
+          {/* Manual Override - Disabled for service hours conflicts */}
+          {conflictReason !== 'outside_service_hours' && (
+            <div className="border-t pt-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold mb-1">
+                    Manual Override
+                  </h3>
+                  <p className="text-xs text-gray-500">
+                    {showOverrideConfirm
+                      ? 'Are you sure you want to proceed with this reservation despite the conflict?'
+                      : 'Proceed with the reservation despite the conflict.'}
+                  </p>
+                </div>
+                <div className="flex gap-2 ml-4">
+                  {showOverrideConfirm && (
+                    <Button
+                      onClick={() => setShowOverrideConfirm(false)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => setShowOverrideConfirm(false)}
+                    onClick={handleOverride}
                     size="sm"
-                    variant="outline"
+                    variant={showOverrideConfirm ? 'destructive' : 'outline'}
                   >
-                    Cancel
+                    {showOverrideConfirm ? 'Confirm Override' : 'Override'}
                   </Button>
-                )}
-                <Button
-                  onClick={handleOverride}
-                  size="sm"
-                  variant={showOverrideConfirm ? 'destructive' : 'outline'}
-                >
-                  {showOverrideConfirm ? 'Confirm Override' : 'Override'}
-                </Button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Service hours conflict - no override allowed */}
+          {conflictReason === 'outside_service_hours' && (
+            <div className="border-t pt-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800 font-medium">
+                  Reservations cannot be created outside service hours (11:00 -
+                  00:00).
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Please select a time within the restaurant's operating hours.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   );
 }
-

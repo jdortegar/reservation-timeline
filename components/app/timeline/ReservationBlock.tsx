@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, memo } from 'react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import { formatTimeRange } from '@/lib/helpers/time';
 import { parseISO } from 'date-fns';
@@ -18,17 +18,13 @@ interface ReservationBlockProps {
   onDragStart?: (e: React.MouseEvent) => void;
   onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
   onContextMenu?: (e: React.MouseEvent, reservation: Reservation) => void;
-  configDate: string;
   configTimezone?: string;
   zoom: number;
-  tableIndex: number;
-  visibleTables: Table[];
-  gridContainerRef?: React.RefObject<HTMLDivElement | null>;
   allReservations?: Reservation[];
   table?: Table;
 }
 
-export function ReservationBlock({
+function ReservationBlockComponent({
   reservation,
   style,
   isSelected,
@@ -37,12 +33,8 @@ export function ReservationBlock({
   onDragStart,
   onResizeStart,
   onContextMenu,
-  configDate,
   configTimezone,
   zoom,
-  tableIndex,
-  visibleTables,
-  gridContainerRef,
   allReservations = [],
   table,
 }: ReservationBlockProps) {
@@ -51,25 +43,43 @@ export function ReservationBlock({
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
   const [hasDragged, setHasDragged] = useState(false);
   const blockRef = useRef<HTMLDivElement>(null);
-  const backgroundColor =
-    RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF';
-  const startTime = parseISO(reservation.startTime);
-  const endTime = parseISO(reservation.endTime);
-  const timeRange = formatTimeRange(startTime, endTime, configTimezone);
-  const isCancelled = reservation.status === 'CANCELLED';
 
-  // Check for conflicts
-  const conflictCheck =
-    table && allReservations.length > 0
-      ? checkAllConflicts(reservation, allReservations, table, reservation.id)
-      : {
-          hasConflict: false,
-          conflictingReservationIds: [],
-          reason: undefined,
-        };
+  // Memoize expensive calculations
+  const backgroundColor = useMemo(
+    () => RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF',
+    [reservation.status],
+  );
 
-  const hasConflict = conflictCheck.hasConflict;
-  const conflictReason = conflictCheck.reason;
+  const { timeRange, isCancelled } = useMemo(() => {
+    const start = parseISO(reservation.startTime);
+    const end = parseISO(reservation.endTime);
+    return {
+      timeRange: formatTimeRange(start, end, configTimezone),
+      isCancelled: reservation.status === 'CANCELLED',
+    };
+  }, [
+    reservation.startTime,
+    reservation.endTime,
+    reservation.status,
+    configTimezone,
+  ]);
+
+  // Memoize conflict check - only recalculate when reservation, table, or allReservations change
+  const { hasConflict, conflictReason } = useMemo(() => {
+    if (!table || allReservations.length === 0) {
+      return { hasConflict: false, conflictReason: undefined };
+    }
+    const conflictCheck = checkAllConflicts(
+      reservation,
+      allReservations,
+      table,
+      reservation.id,
+    );
+    return {
+      hasConflict: conflictCheck.hasConflict,
+      conflictReason: conflictCheck.reason,
+    };
+  }, [reservation, table, allReservations]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -244,3 +254,8 @@ export function ReservationBlock({
     </>
   );
 }
+
+// Memoize component to prevent unnecessary re-renders
+// Best practice: Use default shallow comparison (React handles it efficiently)
+// Custom comparison only needed if reservation objects are recreated with same values
+export const ReservationBlock = memo(ReservationBlockComponent);

@@ -45,12 +45,15 @@ export interface TimelineState {
 
 export const createTimelineSlice: StateCreator<TimelineState> = (set) => ({
   config: {
-    date: new Date().toISOString().split('T')[0],
+    // Always initialize with placeholder - will be updated on client mount
+    // This ensures server and client render the same initial value
+    date: '2000-01-01',
     startHour: 11,
     endHour: 24,
     slotMinutes: 15,
     viewMode: 'day',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, // Default to browser's timezone
+    // Always initialize with placeholder - will be updated on client mount
+    timezone: 'UTC',
   },
   sectors: [],
   tables: [],

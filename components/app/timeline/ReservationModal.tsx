@@ -12,6 +12,7 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -86,9 +87,14 @@ export function ReservationModal({
   useEffect(() => {
     if (reservation) {
       const startDate = new Date(reservation.startTime);
-      const localDateTime = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+      // Format as YYYY-MM-DDTHH:mm for datetime-local input
+      // Preserve the date and time from the ISO string
+      const year = startDate.getFullYear();
+      const month = String(startDate.getMonth() + 1).padStart(2, '0');
+      const day = String(startDate.getDate()).padStart(2, '0');
+      const hours = String(startDate.getHours()).padStart(2, '0');
+      const minutes = String(startDate.getMinutes()).padStart(2, '0');
+      const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
       
       reset({
         customerName: reservation.customer.name,
@@ -104,9 +110,14 @@ export function ReservationModal({
       });
     } else if (initialTableId && initialStartTime) {
       const startDate = new Date(initialStartTime);
-      const localDateTime = new Date(startDate.getTime() - startDate.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 16);
+      // Format as YYYY-MM-DDTHH:mm for datetime-local input
+      // Preserve the date and time from the ISO string
+      const year = startDate.getFullYear();
+      const month = String(startDate.getMonth() + 1).padStart(2, '0');
+      const day = String(startDate.getDate()).padStart(2, '0');
+      const hours = String(startDate.getHours()).padStart(2, '0');
+      const minutes = String(startDate.getMinutes()).padStart(2, '0');
+      const localDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
       
       reset({
         customerName: '',
@@ -120,13 +131,84 @@ export function ReservationModal({
         priority: 'STANDARD',
         notes: '',
       });
+    } else if (initialTableId) {
+      // If table is provided but no startTime, set default to today at 12:00 PM
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      const defaultTime = `${year}-${month}-${day}T12:00`;
+      
+      reset({
+        customerName: '',
+        phone: '',
+        email: '',
+        partySize: 2,
+        tableId: initialTableId,
+        startTime: defaultTime,
+        duration: initialDuration || TIMELINE_CONFIG.DEFAULT_DURATION_MINUTES,
+        status: 'CONFIRMED',
+        priority: 'STANDARD',
+        notes: '',
+      });
     }
   }, [reservation, initialTableId, initialStartTime, initialDuration, reset]);
 
   const onSubmit = (data: ReservationFormData) => {
-    if (!selectedTable) return;
+    if (!selectedTable) {
+      setError('tableId', {
+        type: 'manual',
+        message: 'Please select a table',
+      });
+      return;
+    }
 
-    const start = new Date(data.startTime);
+    // Validate startTime format
+    if (!data.startTime || !data.startTime.includes('T')) {
+      setError('startTime', {
+        type: 'manual',
+        message: 'Please enter a valid start time',
+      });
+      return;
+    }
+
+    // Parse the local datetime string (YYYY-MM-DDTHH:mm format)
+    // This is in local time, so we need to create a Date object that preserves the date
+    // The datetime-local input provides the date/time in local timezone
+    const [datePart, timePart] = data.startTime.split('T');
+    if (!datePart || !timePart) {
+      setError('startTime', {
+        type: 'manual',
+        message: 'Invalid date/time format',
+      });
+      return;
+    }
+
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+
+    // Validate parsed values
+    if (isNaN(year) || isNaN(month) || isNaN(day) || isNaN(hours) || isNaN(minutes)) {
+      setError('startTime', {
+        type: 'manual',
+        message: 'Invalid date/time values',
+      });
+      return;
+    }
+    
+    // Create a Date object in local timezone
+    // This ensures the date is preserved correctly
+    const start = new Date(year, month - 1, day, hours, minutes);
+    
+    // Validate the date object
+    if (isNaN(start.getTime())) {
+      setError('startTime', {
+        type: 'manual',
+        message: 'Invalid date/time',
+      });
+      return;
+    }
+
     const end = addMinutes(start, data.duration);
 
     const reservationData: Reservation = {
@@ -189,6 +271,12 @@ export function ReservationModal({
 
   const handleConflictOverride = () => {
     if (!conflictReservation) return;
+    
+    // Prevent override for service hours conflicts
+    if (conflictReason === 'outside_service_hours') {
+      return;
+    }
+    
     if (reservationId) {
       updateReservation(reservationId, conflictReservation);
     } else {
@@ -209,6 +297,11 @@ export function ReservationModal({
             <DialogTitle>
               {reservationId ? 'Edit Reservation' : 'Create Reservation'}
             </DialogTitle>
+            <DialogDescription>
+              {reservationId
+                ? 'Update the reservation details below.'
+                : 'Fill in the details to create a new reservation.'}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

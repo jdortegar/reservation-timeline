@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, addDays, subDays } from 'date-fns';
 import { useStore } from '@/store/store';
 import { Button } from '@/components/ui/button';
@@ -55,12 +55,30 @@ export function TimelineToolbar() {
   } = useStore();
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  // Initialize with placeholder to match server render
+  const [mountedDate, setMountedDate] = useState('2000-01-01');
+
+  // Only render formatted date on client to avoid hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+    // Update mounted date after hydration to match current config
+    // This ensures server and client render the same initial value
+    setMountedDate(config.date);
+  }, [config.date]);
+
+  // Sync mountedDate when config.date changes (but only after mount)
+  useEffect(() => {
+    if (isClient) {
+      setMountedDate(config.date);
+    }
+  }, [config.date, isClient]);
 
   // Parse date string to Date object, handling timezone correctly
   const currentDate = useMemo(() => {
-    const [year, month, day] = config.date.split('-').map(Number);
+    const [year, month, day] = mountedDate.split('-').map(Number);
     return new Date(year, month - 1, day);
-  }, [config.date]);
+  }, [mountedDate]);
 
   const handleDateChange = (date: Date | undefined) => {
     if (date) {
@@ -138,7 +156,7 @@ export function TimelineToolbar() {
                   size="sm"
                   className="w-[200px] justify-start text-left font-normal"
                 >
-                  {format(currentDate, 'PPP')}
+                  {isClient ? format(currentDate, 'PPP') : mountedDate}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">

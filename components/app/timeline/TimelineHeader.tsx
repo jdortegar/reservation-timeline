@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { formatTimeSlot } from '@/lib/helpers/time';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 
@@ -9,12 +10,12 @@ interface TimelineHeaderProps {
   timezone?: string;
 }
 
-export function TimelineHeader({
+function TimelineHeaderComponent({
   timeSlots,
   zoom,
   timezone,
 }: TimelineHeaderProps) {
-  const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
+  const cellWidth = useMemo(() => TIMELINE_CONFIG.CELL_WIDTH_PX * zoom, [zoom]);
 
   return (
     <div
@@ -36,25 +37,26 @@ export function TimelineHeader({
             const isHour = slot.getMinutes() === 0;
             const isHalfHour = slot.getMinutes() === 30;
             const isLastSlot = index === timeSlots.length - 1;
+            const isFirstSlot = index === 0;
             const isMidnight = slot.getHours() === 0 && slot.getMinutes() === 0;
 
             return (
               <div
                 key={index}
                 className={`flex items-center justify-center text-xs font-medium text-gray-700 ${
-                  isLastSlot ? '' : 'border-r'
+                  isFirstSlot ? '' : 'border-l'
                 }`}
                 style={{
                   width: cellWidth,
                   height: '100%',
-                  borderRightWidth: isLastSlot
+                  borderLeftWidth: isFirstSlot
                     ? 0
                     : isHour
                     ? 2
                     : isHalfHour
                     ? 1
                     : 0.5,
-                  borderRightColor: isLastSlot
+                  borderLeftColor: isFirstSlot
                     ? 'transparent'
                     : isHour
                     ? '#374151'
@@ -72,9 +74,9 @@ export function TimelineHeader({
               </div>
             );
           })}
-          {/* Final border at the end of the grid (00:00) - right edge of last slot */}
+          {/* Final border at the end of the grid (00:00) - left edge of last slot */}
           <div
-            className="absolute border-r-2 border-gray-300"
+            className="absolute border-l-2 border-gray-300"
             style={{
               left: timeSlots.length * cellWidth,
               top: 0,
@@ -87,3 +89,8 @@ export function TimelineHeader({
     </div>
   );
 }
+
+// Memoize TimelineHeader to prevent unnecessary re-renders
+// Best practice: Use default shallow comparison (React handles it efficiently)
+// Custom comparison only needed if timeSlots array is recreated with same values
+export const TimelineHeader = memo(TimelineHeaderComponent);

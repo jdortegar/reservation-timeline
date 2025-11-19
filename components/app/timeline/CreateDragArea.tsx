@@ -53,6 +53,12 @@ export function CreateDragArea({
   >(undefined);
   const areaRef = useRef<HTMLDivElement>(null);
 
+  // Reset conflict state when date changes
+  useEffect(() => {
+    setHasConflict(false);
+    setConflictReason(undefined);
+  }, [configDate]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
 
@@ -128,9 +134,15 @@ export function CreateDragArea({
         updatedAt: new Date().toISOString(),
       };
 
+      // Filter reservations to only check conflicts for the same table
+      // This allows creating reservations on any date
+      const tableReservations = reservations.filter(
+        (r) => r.tableId === table.id,
+      );
+
       const conflictCheck = checkAllConflicts(
         tempReservation,
-        reservations,
+        tableReservations,
         table,
       );
 
@@ -180,7 +192,12 @@ export function CreateDragArea({
     startPos,
     zoom,
     configDate,
+    configTimezone,
     table.id,
+    table.capacity,
+    defaultPartySize,
+    reservations,
+    hasConflict,
     onDragComplete,
   ]);
 

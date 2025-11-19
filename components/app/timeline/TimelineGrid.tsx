@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback, memo } from 'react';
 import { useStore } from '@/store/store';
 import { getTimeSlots, timeToSlotIndex } from '@/lib/helpers/time';
 import { slotToX, durationToWidth } from '@/lib/helpers/coordinates';
@@ -33,7 +33,7 @@ interface TimelineGridProps {
   ) => void;
 }
 
-function SectorHeader({
+const SectorHeader = memo(function SectorHeader({
   sector,
   isCollapsed,
   onToggle,
@@ -46,8 +46,11 @@ function SectorHeader({
   timeSlots: Date[];
   zoom: number;
 }) {
-  const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
-  const gridWidth = timeSlots.length * cellWidth;
+  const cellWidth = useMemo(() => TIMELINE_CONFIG.CELL_WIDTH_PX * zoom, [zoom]);
+  const gridWidth = useMemo(
+    () => timeSlots.length * cellWidth,
+    [timeSlots.length, cellWidth],
+  );
 
   return (
     <div className="flex" style={{ height: 40 }}>
@@ -78,7 +81,7 @@ function SectorHeader({
       />
     </div>
   );
-}
+});
 
 export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const gridContainerRef = useRef<HTMLDivElement>(null);
@@ -168,10 +171,14 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     return map;
   }, [filteredReservations]);
 
-  const [currentTime, setCurrentTime] = useState(new Date());
+  // Initialize with null to avoid hydration mismatch, then set on client mount
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   // Update current time every minute to keep marker accurate
   useEffect(() => {
+    // Set initial time on client mount
+    setCurrentTime(new Date());
+
     const interval = setInterval(() => {
       setCurrentTime(new Date());
     }, 60000); // Update every minute
@@ -180,6 +187,11 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   }, []);
 
   const currentTimeSlot = useMemo(() => {
+    // Don't calculate on server or before client mount
+    if (!currentTime) {
+      return -1;
+    }
+
     const now = currentTime;
     // Get today's date in YYYY-MM-DD format, handling timezone correctly
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -353,16 +365,22 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     deleteReservation(reservationId);
   };
 
-  const handleDeleteMultiple = (reservationIds: string[]) => {
-    saveToHistory();
-    deleteReservations(reservationIds);
-  };
+  const handleDeleteMultiple = useCallback(
+    (reservationIds: string[]) => {
+      saveToHistory();
+      deleteReservations(reservationIds);
+    },
+    [saveToHistory, deleteReservations],
+  );
 
-  const handleCopy = (reservationsToCopy: Reservation[]) => {
-    copyReservations(reservationsToCopy);
-  };
+  const handleCopy = useCallback(
+    (reservationsToCopy: Reservation[]) => {
+      copyReservations(reservationsToCopy);
+    },
+    [copyReservations],
+  );
 
-  const handlePaste = () => {
+  const handlePaste = useCallback(() => {
     // Paste at current time or first selected reservation's time
     const targetStartTime =
       selectedReservationIds.length > 0
@@ -371,7 +389,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
         : undefined;
     saveToHistory();
     pasteReservations(undefined, targetStartTime);
-  };
+  }, [selectedReservationIds, reservations, saveToHistory, pasteReservations]);
 
   const handleDuplicateMultiple = (reservationIds: string[]) => {
     const reservationsToDuplicate = reservations.filter((r) =>
@@ -528,19 +546,20 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                           <ReservationBlock
                             key={reservation.id}
                             allReservations={reservations}
-                            configDate={config.date}
                             configTimezone={config.timezone}
-                            gridContainerRef={gridContainerRef}
                             isDragging={isDragging}
                             isSelected={isSelected}
-                            onDragStart={(e) => {
+                            onDragStart={(e: React.MouseEvent) => {
                               handleDragStart(reservation, e, x, absoluteIndex);
                             }}
-                            onResizeStart={(e, edge) => {
+                            onResizeStart={(
+                              e: React.MouseEvent,
+                              edge: 'left' | 'right',
+                            ) => {
                               handleResizeStart(reservation, edge, e, x);
                             }}
                             onContextMenu={handleContextMenu}
-                            onSelect={(e) => {
+                            onSelect={(e: React.MouseEvent) => {
                               const { selectReservation } = useStore.getState();
                               selectReservation(
                                 reservation.id,
@@ -563,8 +582,6 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                               opacity: isResizing ? 0.7 : 1,
                             }}
                             table={table}
-                            tableIndex={absoluteIndex}
-                            visibleTables={visibleTables}
                             zoom={zoom}
                           />
                         );
@@ -595,17 +612,10 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
         {/* Drop Preview - shows snapped drop position */}
         {dropPreview && draggingReservation && (
           <DropPreviewBlock
-            configDate={config.date}
-            conflictReason={dropPreview.conflictReason}
             hasConflict={dropPreview.hasConflict}
             height={dropPreview.height}
             left={dropPreview.left}
-            originalTableIndex={draggingReservation.originalTableIndex}
-            reservation={draggingReservation.reservation}
-            slotIndex={dropPreview.slotIndex}
-            tableIndex={dropPreview.tableIndex}
             top={dropPreview.top}
-            visibleTables={visibleTables}
             width={dropPreview.width}
           />
         )}

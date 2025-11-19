@@ -163,7 +163,8 @@ const HARDCODED_RESERVATIONS: Reservation[] = [
 ];
 
 export function TimelineView() {
-  const { config, setSectors, setTables, setReservations } = useStore();
+  const { config, setSectors, setTables, setReservations, setConfig } =
+    useStore();
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     tableId?: string;
@@ -173,16 +174,40 @@ export function TimelineView() {
   }>({ isOpen: false });
 
   useEffect(() => {
+    // Only run on client to avoid hydration mismatch
+    if (typeof window === 'undefined') return;
+
     setSectors(SEED_SECTORS);
     setTables(SEED_TABLES);
-    const today = new Date().toISOString().split('T')[0];
-    const reservations = HARDCODED_RESERVATIONS.map((r) => ({
-      ...r,
-      startTime: r.startTime.replace('2025-01-15', today),
-      endTime: r.endTime.replace('2025-01-15', today),
-    }));
+
+    // Initialize config with current date/timezone on client mount
+    // Use a small delay to ensure hydration completes first
+    const initConfig = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      // Update config if it's still using placeholder values
+      if (config.date === '2000-01-01' || config.timezone === 'UTC') {
+        setConfig({ date: today, timezone });
+      }
+    };
+
+    // Use requestAnimationFrame to ensure this runs after initial render
+    requestAnimationFrame(initConfig);
+
+    const reservations = HARDCODED_RESERVATIONS.map((r) => {
+      const today =
+        config.date === '2000-01-01'
+          ? new Date().toISOString().split('T')[0]
+          : config.date;
+      return {
+        ...r,
+        startTime: r.startTime.replace('2025-01-15', today),
+        endTime: r.endTime.replace('2025-01-15', today),
+      };
+    });
     setReservations(reservations);
-  }, [config.date, setSectors, setTables, setReservations]);
+  }, [setSectors, setTables, setReservations, setConfig]);
 
   return (
     <DndProvider backend={HTML5Backend}>

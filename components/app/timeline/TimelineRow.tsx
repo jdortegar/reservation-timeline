@@ -1,5 +1,6 @@
 'use client';
 
+import { memo, useMemo } from 'react';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import type { Table } from '@/lib/types/Reservation';
 
@@ -11,15 +12,18 @@ interface TimelineRowProps {
   isLastRow?: boolean;
 }
 
-export function TimelineRow({
+function TimelineRowComponent({
   table,
   timeSlots,
   zoom,
   children,
   isLastRow = false,
 }: TimelineRowProps) {
-  const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
-  const gridWidth = timeSlots.length * cellWidth;
+  const cellWidth = useMemo(() => TIMELINE_CONFIG.CELL_WIDTH_PX * zoom, [zoom]);
+  const gridWidth = useMemo(
+    () => timeSlots.length * cellWidth,
+    [timeSlots.length, cellWidth],
+  );
 
   return (
     <div
@@ -52,7 +56,7 @@ export function TimelineRow({
   );
 }
 
-function GridCells({
+const GridCells = memo(function GridCells({
   timeSlots,
   cellWidth,
 }: {
@@ -67,23 +71,24 @@ function GridCells({
         const isHour = slot.getMinutes() === 0;
         const isHalfHour = slot.getMinutes() === 30;
         const isLastSlot = index === timeSlots.length - 1;
+        const isFirstSlot = index === 0;
 
-        // Don't render border for the last slot (00:00) - it will be the final border
-        if (isLastSlot) {
+        // Don't render border for the first slot - it's at the start
+        if (isFirstSlot) {
           return null;
         }
 
         return (
           <div
             key={index}
-            className="absolute border-r"
+            className="absolute border-l"
             style={{
               left: index * cellWidth,
               top: 0,
               width: cellWidth,
               height: '100%',
-              borderRightWidth: isHour ? 2 : isHalfHour ? 1 : 0.5,
-              borderRightColor: isHour
+              borderLeftWidth: isHour ? 2 : isHalfHour ? 1 : 0.5,
+              borderLeftColor: isHour
                 ? '#374151'
                 : isHalfHour
                 ? '#9CA3AF'
@@ -92,9 +97,9 @@ function GridCells({
           />
         );
       })}
-      {/* Final border at the end of the grid (00:00) - right edge of last slot */}
+      {/* Final border at the end of the grid (00:00) - left edge of last slot */}
       <div
-        className="absolute border-r-2 border-gray-300"
+        className="absolute border-l-2 border-gray-300"
         style={{
           left: gridWidth,
           top: 0,
@@ -104,4 +109,9 @@ function GridCells({
       />
     </>
   );
-}
+});
+
+// Memoize TimelineRow to prevent unnecessary re-renders
+// Best practice: Use default shallow comparison (React handles it efficiently)
+// Custom comparison only needed if table objects are recreated with same values
+export const TimelineRow = memo(TimelineRowComponent);

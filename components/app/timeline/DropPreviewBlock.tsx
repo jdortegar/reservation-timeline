@@ -1,38 +1,19 @@
 'use client';
 
-import { formatTimeRange, slotIndexToTime } from '@/lib/helpers/time';
-import { addMinutes } from 'date-fns';
-import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
-import type { Reservation, Table } from '@/lib/types/Reservation';
-
 interface DropPreviewBlockProps {
-  reservation: Reservation;
   left: number;
   top: number;
   width: number;
   height: number;
-  slotIndex: number;
-  tableIndex: number;
-  originalTableIndex: number;
-  configDate: string;
-  visibleTables: Table[];
   hasConflict?: boolean;
-  conflictReason?: 'overlap' | 'capacity_exceeded' | 'outside_service_hours';
 }
 
 export function DropPreviewBlock({
-  reservation,
   left,
   top,
   width,
   height,
-  slotIndex,
-  tableIndex,
-  originalTableIndex,
-  configDate,
-  visibleTables,
   hasConflict = false,
-  conflictReason,
 }: DropPreviewBlockProps) {
   // Use green for valid drops, red for conflicts
   const borderColor = hasConflict ? '#EF4444' : '#10B981'; // Green: #10B981, Red: #EF4444
@@ -60,4 +41,3 @@ export function DropPreviewBlock({
     />
   );
 }
-
