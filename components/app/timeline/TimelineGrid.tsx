@@ -165,17 +165,44 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     return map;
   }, [filteredReservations]);
 
-  const currentTimeSlot = useMemo(() => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    if (today !== config.date) return -1;
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-    return timeSlots.findIndex((slot) => {
+  // Update current time every minute to keep marker accurate
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentTimeSlot = useMemo(() => {
+    const now = currentTime;
+    // Get today's date in YYYY-MM-DD format, handling timezone correctly
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      .toISOString()
+      .split('T')[0];
+
+    // Compare dates (config.date is in YYYY-MM-DD format)
+    if (today !== config.date) {
+      return -1; // Not viewing today, don't show marker
+    }
+
+    // Find the slot that contains the current time
+    const slotIndex = timeSlots.findIndex((slot, index) => {
       const slotTime = slot.getTime();
-      const nextSlotTime = slotTime + 15 * 60 * 1000;
+      // For the last slot (00:00), check if we're at or after it
+      if (index === timeSlots.length - 1) {
+        return now.getTime() >= slotTime;
+      }
+      // For other slots, check if current time is within this slot's 15-minute window
+      const nextSlotTime = timeSlots[index + 1]?.getTime();
+      if (!nextSlotTime) return false;
       return now.getTime() >= slotTime && now.getTime() < nextSlotTime;
     });
-  }, [timeSlots, config.date]);
+
+    return slotIndex;
+  }, [timeSlots, config.date, currentTime]);
 
   const groupedTables = useMemo(() => {
     const sortedTables = [...tables].sort((a, b) => {
@@ -381,6 +408,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const timelineGridWidth = timeSlots.length * cellWidth;
   const gridWidth = 200 + timelineGridWidth; // Sidebar (200px) + Timeline grid
   const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
+  const contentHeight = visibleTables.length * 60 + groupedTables.length * 40; // Height below header
 
   const currentTimeX =
     currentTimeSlot >= 0 ? slotToX(currentTimeSlot, zoom) : null;
@@ -391,14 +419,14 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
         style={{ width: gridWidth, height: gridHeight, position: 'relative' }}
       >
         <TimelineHeader timeSlots={timeSlots} zoom={zoom} />
-        {currentTimeX !== null && (
+        {currentTimeX !== null && contentHeight > 0 && (
           <div
             className="absolute z-20 pointer-events-none"
             style={{
               left: 200 + currentTimeX,
               top: 70,
               width: 2,
-              height: visibleTables.length * 60,
+              height: Math.max(0, contentHeight), // Extend to bottom of table (all content below header)
               backgroundColor: '#EF4444',
             }}
           />
