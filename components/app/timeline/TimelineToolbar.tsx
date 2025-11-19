@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { format, addDays, subDays } from 'date-fns';
 import { useStore } from '@/store/store';
+import { useDebounce } from '@/lib/hooks/useDebounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,22 @@ export function TimelineToolbar() {
     setSelectedStatuses,
     setSearchQuery,
   } = useStore();
+
+  // Local state for search input (immediate UI update)
+  const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
+
+  // Debounce search query to 300ms
+  const debouncedSearchQuery = useDebounce(localSearchQuery, 300);
+
+  // Update store when debounced value changes
+  useEffect(() => {
+    setSearchQuery(debouncedSearchQuery);
+  }, [debouncedSearchQuery, setSearchQuery]);
+
+  // Sync local state when store searchQuery changes externally
+  useEffect(() => {
+    setLocalSearchQuery(searchQuery);
+  }, [searchQuery]);
 
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isClient, setIsClient] = useState(false);
@@ -120,11 +137,14 @@ export function TimelineToolbar() {
   const clearFilters = () => {
     setSelectedSectors([]);
     setSelectedStatuses([]);
+    setLocalSearchQuery('');
     setSearchQuery('');
   };
 
   const activeFilterCount =
-    selectedSectors.length + selectedStatuses.length + (searchQuery ? 1 : 0);
+    selectedSectors.length +
+    selectedStatuses.length +
+    (debouncedSearchQuery ? 1 : 0);
 
   const allStatuses: ReservationStatus[] = [
     'PENDING',
@@ -282,16 +302,19 @@ export function TimelineToolbar() {
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search by name or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={localSearchQuery}
+              onChange={(e) => setLocalSearchQuery(e.target.value)}
               className="pl-8 h-9"
             />
-            {searchQuery && (
+            {localSearchQuery && (
               <Button
                 variant="ghost"
                 size="sm"
                 className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setLocalSearchQuery('');
+                  setSearchQuery('');
+                }}
               >
                 <X className="h-3 w-3" />
               </Button>

@@ -108,6 +108,13 @@ export function useReservationResize({
       originalWidth,
       initialPointerX,
     });
+
+    // Store initial mouse position for immediate first update
+    // This ensures the first RAF update processes the initial position
+    latestMouseEventRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+    } as MouseEvent;
   };
 
   useEffect(() => {
@@ -189,7 +196,11 @@ export function useReservationResize({
         // Snap to slot boundaries
         const newStartSlot = xToSlot(newLeft, zoom);
         newLeft = slotToX(newStartSlot, zoom);
-        newStartTime = slotIndexToTime(newStartSlot, configDate, configTimezone);
+        newStartTime = slotIndexToTime(
+          newStartSlot,
+          configDate,
+          configTimezone,
+        );
 
         // Calculate new duration (keep end time, adjust start)
         const originalEndSlot = timeToSlotIndex(

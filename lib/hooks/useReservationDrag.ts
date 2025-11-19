@@ -123,6 +123,13 @@ export function useReservationDrag({
       clickOffsetX,
       clickOffsetY,
     });
+
+    // Store initial mouse position for immediate first update
+    // This ensures the first RAF update processes the initial position
+    latestMouseEventRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+    } as MouseEvent;
   };
 
   // Handle mouse move and mouse up for drag

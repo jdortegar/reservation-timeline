@@ -365,6 +365,12 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       style={{
         userSelect:
           draggingReservation || resizingReservation ? 'none' : 'auto',
+        // Optimize scrolling performance
+        willChange: 'scroll-position',
+        overscrollBehavior: 'contain',
+        // Enable hardware acceleration
+        transform: 'translateZ(0)',
+        WebkitOverflowScrolling: 'touch',
       }}
     >
       <div
