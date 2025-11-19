@@ -247,6 +247,8 @@ export function CreateDragArea({
     <>
       <div
         ref={areaRef}
+        role="region"
+        aria-label={`Create new reservation on ${table.name}. Click and drag to select time slot.`}
         className="absolute inset-0 cursor-crosshair"
         onMouseDown={handleMouseDown}
         style={{ zIndex: 1, pointerEvents: 'auto' }}

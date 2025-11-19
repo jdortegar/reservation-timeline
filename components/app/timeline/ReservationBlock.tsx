@@ -81,6 +81,22 @@ function ReservationBlockComponent({
     };
   }, [reservation, table, allReservations]);
 
+  // Generate accessible label for the reservation block
+  const ariaLabel = useMemo(() => {
+    const statusText =
+      reservation.status === 'CANCELLED' ? 'Cancelled' : reservation.status;
+    const conflictText = hasConflict
+      ? 'Warning: This reservation has a conflict. '
+      : '';
+    return `${conflictText}Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, ${timeRange}, Status: ${statusText}. Use arrow keys to move, Enter or Space to select, right-click for menu.`;
+  }, [
+    reservation.customer.name,
+    reservation.partySize,
+    timeRange,
+    reservation.status,
+    hasConflict,
+  ]);
+
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     if (isCancelled) return;
@@ -111,6 +127,32 @@ function ReservationBlockComponent({
     setShowTooltip(false);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (isCancelled) return;
+
+    // Enter or Space to select
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (onSelect) {
+        // Create a synthetic mouse event for compatibility
+        const syntheticEvent = {
+          ...e,
+          metaKey: e.metaKey,
+          ctrlKey: e.ctrlKey,
+        } as unknown as React.MouseEvent;
+        onSelect(syntheticEvent);
+      }
+      return;
+    }
+
+    // Arrow keys for navigation (could be extended for drag in future)
+    // For now, just prevent default to avoid scrolling
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      e.preventDefault();
+      // Future: Could implement keyboard-based drag here
+    }
+  };
+
   const blockStyle = isDraggingProp
     ? {
         ...style,
@@ -128,12 +170,18 @@ function ReservationBlockComponent({
       <div
         ref={blockRef}
         data-reservation-block
+        role="button"
+        tabIndex={isCancelled ? -1 : 0}
+        aria-label={ariaLabel}
+        aria-selected={isSelected}
+        aria-disabled={isCancelled}
         className={clsx(
           'absolute rounded px-2 py-1 text-white text-xs shadow-lg border',
           !isDraggingProp && 'transition-all',
           isSelected && 'ring-2 ring-blue-500 ring-offset-1',
           isCancelled && 'opacity-60',
-          !isCancelled && 'cursor-move',
+          !isCancelled &&
+            'cursor-move focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
           isDraggingProp && 'transition-none',
           hasConflict && !isDraggingProp
             ? 'border-red-500 border-2'
@@ -160,6 +208,7 @@ function ReservationBlockComponent({
           }
           setHasDragged(false);
         }}
+        onKeyDown={handleKeyDown}
         onMouseDown={handleMouseDown}
         onMouseEnter={(e) => {
           if (!isDraggingProp) {
@@ -183,6 +232,8 @@ function ReservationBlockComponent({
         {hasConflict && !isDraggingProp && (
           <div
             className="absolute -left-3 top-1/2 -translate-y-1/2 flex items-center justify-center w-8 h-8 bg-red-500 rounded-full z-20 shadow-lg border-2 border-white"
+            role="img"
+            aria-label="Warning: Reservation conflict"
             title={getConflictMessage(conflictReason, table)}
             onMouseEnter={(e) => {
               if (!isDraggingProp) {
@@ -200,7 +251,12 @@ function ReservationBlockComponent({
               }
             }}
           >
-            <span className="text-white text-xl font-bold leading-none">⚠</span>
+            <span
+              className="text-white text-xl font-bold leading-none"
+              aria-hidden="true"
+            >
+              ⚠
+            </span>
           </div>
         )}
         <div className="font-semibold truncate leading-tight">
@@ -221,6 +277,9 @@ function ReservationBlockComponent({
           <>
             <div
               data-resize-handle="left"
+              role="button"
+              tabIndex={-1}
+              aria-label={`Resize reservation start time for ${reservation.customer.name}`}
               className="absolute cursor-ew-resize h-full left-0 top-0 w-2 hover:bg-white/30 transition-colors"
               style={{
                 borderLeft: '2px solid rgba(255, 255, 255, 0.5)',
@@ -230,6 +289,9 @@ function ReservationBlockComponent({
             />
             <div
               data-resize-handle="right"
+              role="button"
+              tabIndex={-1}
+              aria-label={`Resize reservation end time for ${reservation.customer.name}`}
               className="absolute cursor-ew-resize h-full right-0 top-0 w-2 hover:bg-white/30 transition-colors"
               style={{
                 borderRight: '2px solid rgba(255, 255, 255, 0.5)',

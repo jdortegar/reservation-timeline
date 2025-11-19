@@ -26,10 +26,21 @@ export const SectorHeader = memo(function SectorHeader({
     [timeSlots.length, cellWidth],
   );
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onToggle();
+    }
+  };
+
   return (
     <div className="flex" style={{ height: 40 }}>
       <div
-        className="border-r-2 border-gray-300 cursor-pointer hover:opacity-80 flex items-center px-4 font-semibold text-sm transition-colors shrink-0"
+        role="button"
+        tabIndex={0}
+        aria-label={`Toggle ${sector.name} sector`}
+        aria-expanded={!isCollapsed}
+        className="border-r-2 border-gray-300 cursor-pointer hover:opacity-80 flex items-center px-4 font-semibold text-sm transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         style={{
           backgroundColor: sector.color + '20',
           color: sector.color,
@@ -37,11 +48,12 @@ export const SectorHeader = memo(function SectorHeader({
           height: '100%',
         }}
         onClick={onToggle}
+        onKeyDown={handleKeyDown}
       >
         {isCollapsed ? (
-          <ChevronRight className="h-4 w-4 mr-2" />
+          <ChevronRight className="h-4 w-4 mr-2" aria-hidden="true" />
         ) : (
-          <ChevronDown className="h-4 w-4 mr-2" />
+          <ChevronDown className="h-4 w-4 mr-2" aria-hidden="true" />
         )}
         {sector.name}
       </div>
@@ -56,4 +68,3 @@ export const SectorHeader = memo(function SectorHeader({
     </div>
   );
 });
-
