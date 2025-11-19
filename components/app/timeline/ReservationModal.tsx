@@ -17,6 +17,7 @@ import {
 import { ConflictResolutionDialog } from './ConflictResolutionDialog';
 import { TableSuggestions } from './TableSuggestions';
 import { NextAvailableSlots } from './NextAvailableSlots';
+import { VIPSuggestion } from './VIPSuggestion';
 import {
   Dialog,
   DialogContent,
@@ -104,6 +105,8 @@ export function ReservationModal({
   const partySizeRaw = watch('partySize');
   const startTime = watch('startTime');
   const durationRaw = watch('duration');
+  const phone = watch('phone');
+  const customerName = watch('customerName');
 
   // Convert to numbers and handle NaN/empty values
   const partySize =
@@ -661,6 +664,21 @@ export function ReservationModal({
                     Table capacity: {selectedTable.capacity.min}-
                     {selectedTable.capacity.max} seats
                   </p>
+                )}
+                {/* VIP Suggestion */}
+                {phone && partySize && (
+                  <VIPSuggestion
+                    phone={phone}
+                    partySize={partySize}
+                    reservations={reservations.filter(
+                      (r) => r.id !== reservationId,
+                    )}
+                    tables={tables}
+                    currentReservation={reservation || undefined}
+                    onApplyPriority={(priority) => {
+                      setValue('priority', priority, { shouldValidate: true });
+                    }}
+                  />
                 )}
               </div>
 

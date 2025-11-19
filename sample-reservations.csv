@@ -1,0 +1,35 @@
+Customer Name,Phone,Email,Party Size,Date,Time,Duration,Status,Priority,Notes
+John Doe,+1 555-1234,john.doe@example.com,4,2025-12-20,19:00,90,CONFIRMED,STANDARD,Window seat preferred
+Jane Smith,+1 555-5678,jane.smith@example.com,2,2025-12-20,20:00,60,CONFIRMED,VIP,Anniversary dinner
+Bob Johnson,+1 555-9012,bob.johnson@example.com,6,2025-12-20,18:30,120,CONFIRMED,LARGE_GROUP,Birthday party
+Alice Williams,+1 555-3456,alice.williams@example.com,3,2025-12-21,19:30,90,PENDING,STANDARD,
+Charlie Brown,+1 555-7890,charlie.brown@example.com,2,2025-12-21,20:00,60,CONFIRMED,STANDARD,Quiet table please
+Diana Prince,+1 555-2468,diana.prince@example.com,4,2025-12-21,19:00,90,CONFIRMED,VIP,
+Edward Norton,+1 555-1357,edward.norton@example.com,5,2025-12-22,18:00,120,CONFIRMED,LARGE_GROUP,Corporate event
+Fiona Apple,+1 555-8642,fiona.apple@example.com,2,2025-12-22,20:30,60,CONFIRMED,STANDARD,
+George Washington,+1 555-9753,george.washington@example.com,8,2025-12-22,19:00,150,CONFIRMED,LARGE_GROUP,Family reunion
+Helen Keller,+1 555-7410,helen.keller@example.com,3,2025-12-23,19:30,90,PENDING,STANDARD,
+Michael VIP,+1 555-1111,michael.vip@example.com,4,2025-12-25,19:00,90,CONFIRMED,VIP,Regular VIP customer
+Michael VIP,+1 555-1111,michael.vip@example.com,2,2025-12-18,20:00,60,CONFIRMED,VIP,Preferred table 3
+Michael VIP,+1 555-1111,michael.vip@example.com,4,2025-12-15,19:30,90,CONFIRMED,VIP,Window seat requested
+Michael VIP,+1 555-1111,michael.vip@example.com,3,2025-12-12,20:00,60,CONFIRMED,VIP,
+Sarah Frequent,+1 555-2222,sarah.frequent@example.com,2,2025-12-19,19:00,90,CONFIRMED,STANDARD,Quiet corner please
+Sarah Frequent,+1 555-2222,sarah.frequent@example.com,2,2025-12-16,20:00,60,CONFIRMED,STANDARD,
+Sarah Frequent,+1 555-2222,sarah.frequent@example.com,3,2025-12-13,19:30,90,CONFIRMED,STANDARD,Anniversary
+Sarah Frequent,+1 555-2222,sarah.frequent@example.com,2,2025-12-10,20:00,60,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,4,2025-12-17,19:00,90,CONFIRMED,STANDARD,Regular customer
+Robert Loyal,+1 555-3333,robert.loyal@example.com,5,2025-12-14,18:30,120,CONFIRMED,STANDARD,Birthday celebration
+Robert Loyal,+1 555-3333,robert.loyal@example.com,4,2025-12-11,19:00,90,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,3,2025-12-08,20:00,60,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,4,2025-12-05,19:30,90,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,5,2025-12-02,18:00,120,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,4,2025-11-30,19:00,90,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,3,2025-11-27,20:00,60,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,4,2025-11-24,19:30,90,CONFIRMED,STANDARD,
+Robert Loyal,+1 555-3333,robert.loyal@example.com,5,2025-11-21,18:30,120,CONFIRMED,STANDARD,
+Emma Planner,+1 555-4444,emma.planner@example.com,6,2025-12-28,19:00,90,CONFIRMED,STANDARD,Booked 2 weeks in advance
+Emma Planner,+1 555-4444,emma.planner@example.com,4,2025-12-15,20:00,60,CONFIRMED,STANDARD,Booked 10 days ahead
+Emma Planner,+1 555-4444,emma.planner@example.com,5,2025-12-01,19:30,90,CONFIRMED,STANDARD,Planned 2 weeks ahead
+David Large,+1 555-5555,david.large@example.com,8,2025-12-24,19:00,150,CONFIRMED,STANDARD,Large group celebration
+David Large,+1 555-5555,david.large@example.com,7,2025-12-20,18:00,120,CONFIRMED,STANDARD,Corporate dinner
+David Large,+1 555-5555,david.large@example.com,6,2025-12-16,19:30,90,CONFIRMED,STANDARD,Birthday party
