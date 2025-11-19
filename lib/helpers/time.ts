@@ -6,16 +6,25 @@ export function getTimeSlots(date: string): Date[] {
   const slots: Date[] = [];
   const baseDate = parse(date, 'yyyy-MM-dd', new Date());
 
+  // Generate slots from START_HOUR (11) to END_HOUR (24, which is 00:00)
+  // This creates 13 hours: 11:00, 11:15, ..., 23:45, 00:00 (52 slots total)
   for (
     let hour = TIMELINE_CONFIG.START_HOUR;
     hour < TIMELINE_CONFIG.END_HOUR;
     hour++
   ) {
+    // For all hours 11-23, add all 15-minute slots
     for (let minute = 0; minute < 60; minute += TIMELINE_CONFIG.SLOT_MINUTES) {
       const slotTime = setMinutes(setHours(baseDate, hour), minute);
       slots.push(slotTime);
     }
   }
+  
+  // Add 00:00 (midnight) as the final slot
+  // This is technically the start of the next day, but displayed as part of current day
+  const nextDay = addMinutes(baseDate, 24 * 60);
+  const midnight = setMinutes(setHours(nextDay, 0), 0);
+  slots.push(midnight);
 
   return slots;
 }

@@ -5,6 +5,7 @@ import { useStore } from '@/store/store';
 import { getTimeSlots, timeToSlotIndex } from '@/lib/helpers/time';
 import { slotToX, durationToWidth } from '@/lib/helpers/coordinates';
 import { parseISO, addMinutes } from 'date-fns';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { TimelineHeader } from './TimelineHeader';
 import { TimelineRow } from './TimelineRow';
 import { ReservationBlock } from './ReservationBlock';
@@ -36,23 +37,45 @@ function SectorHeader({
   sector,
   isCollapsed,
   onToggle,
+  timeSlots,
+  zoom,
 }: {
   sector: Sector;
   isCollapsed: boolean;
   onToggle: () => void;
+  timeSlots: Date[];
+  zoom: number;
 }) {
+  const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
+  const gridWidth = timeSlots.length * cellWidth;
+
   return (
-    <div
-      className="border-b border-t cursor-pointer hover:opacity-80 flex items-center px-4 font-semibold text-sm transition-colors"
-      style={{
-        backgroundColor: sector.color + '20',
-        color: sector.color,
-        height: 40,
-      }}
-      onClick={onToggle}
-    >
-      <span className="mr-2 text-lg">{isCollapsed ? '→' : '↓'}</span>
-      {sector.name}
+    <div className="flex" style={{ height: 40 }}>
+      <div
+        className="border-r-2 border-gray-300 cursor-pointer hover:opacity-80 flex items-center px-4 font-semibold text-sm transition-colors shrink-0"
+        style={{
+          backgroundColor: sector.color + '20',
+          color: sector.color,
+          width: 200,
+          height: '100%',
+        }}
+        onClick={onToggle}
+      >
+        {isCollapsed ? (
+          <ChevronRight className="h-4 w-4 mr-2" />
+        ) : (
+          <ChevronDown className="h-4 w-4 mr-2" />
+        )}
+        {sector.name}
+      </div>
+      <div
+        className="border-b border-t border-r-2 border-gray-300 shrink-0 overflow-hidden"
+        style={{
+          backgroundColor: sector.color + '20',
+          width: gridWidth,
+          height: '100%',
+        }}
+      />
     </div>
   );
 }
@@ -70,6 +93,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     reservations,
     sectors,
     collapsedSectors,
+    selectedSectors,
+    selectedStatuses,
+    searchQuery,
     selectedReservationIds,
     updateReservation,
     deleteReservation,
@@ -85,14 +111,59 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
 
   const timeSlots = useMemo(() => getTimeSlots(config.date), [config.date]);
 
+  // Apply filters to reservations
+  const filteredReservations = useMemo(() => {
+    let filtered = [...reservations];
+
+    // Filter by date (only show reservations for the selected date)
+    const selectedDate = config.date;
+    filtered = filtered.filter((r) => {
+      const reservationDate = r.startTime.split('T')[0];
+      return reservationDate === selectedDate;
+    });
+
+    // Filter by sector
+    if (selectedSectors.length > 0) {
+      filtered = filtered.filter((r) => {
+        const table = tables.find((t) => t.id === r.tableId);
+        return table && selectedSectors.includes(table.sectorId);
+      });
+    }
+
+    // Filter by status
+    if (selectedStatuses.length > 0) {
+      filtered = filtered.filter((r) => selectedStatuses.includes(r.status));
+    }
+
+    // Filter by search query (customer name or phone)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(
+        (r) =>
+          r.customer.name.toLowerCase().includes(query) ||
+          r.customer.phone.toLowerCase().includes(query) ||
+          (r.customer.email && r.customer.email.toLowerCase().includes(query)),
+      );
+    }
+
+    return filtered;
+  }, [
+    reservations,
+    config.date,
+    selectedSectors,
+    selectedStatuses,
+    searchQuery,
+    tables,
+  ]);
+
   const reservationsByTable = useMemo(() => {
     const map = new Map<string, Reservation[]>();
-    reservations.forEach((r) => {
+    filteredReservations.forEach((r) => {
       const existing = map.get(r.tableId) || [];
       map.set(r.tableId, [...existing, r]);
     });
     return map;
-  }, [reservations]);
+  }, [filteredReservations]);
 
   const currentTimeSlot = useMemo(() => {
     const now = new Date();
@@ -144,15 +215,25 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   }, [tables, sectors]);
 
   const visibleTables = useMemo(() => {
-    return groupedTables.flatMap((group) => {
+    let tables = groupedTables.flatMap((group) => {
       if (group.sector && collapsedSectors.includes(group.sector.id)) {
         return [];
       }
       return group.tables;
     });
-  }, [groupedTables, collapsedSectors]);
+
+    // Filter tables by selected sectors
+    if (selectedSectors.length > 0) {
+      tables = tables.filter((table) =>
+        selectedSectors.includes(table.sectorId),
+      );
+    }
+
+    return tables;
+  }, [groupedTables, collapsedSectors, selectedSectors]);
 
   // Use custom hook for drag logic (after groupedTables and visibleTables are defined)
+  // Use full reservations array for conflict checking, but filtered for display
   const { draggingReservation, ghostPreview, dropPreview, handleDragStart } =
     useReservationDrag({
       collapsedSectors,
@@ -160,12 +241,13 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       gridContainerRef,
       groupedTables,
       onUpdateReservation: updateReservation,
-      reservations,
+      reservations, // Use full array for conflict checking
       visibleTables,
       zoom,
     });
 
   // Use custom hook for resize logic
+  // Use full reservations array for conflict checking
   const { resizingReservation, resizePreview, handleResizeStart } =
     useReservationResize({
       collapsedSectors,
@@ -173,7 +255,7 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       gridContainerRef,
       groupedTables,
       onUpdateReservation: updateReservation,
-      reservations,
+      reservations, // Use full array for conflict checking
       visibleTables,
       zoom,
     });
@@ -295,7 +377,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     selectedReservationIds,
   });
 
-  const gridWidth = timeSlots.length * 60 * zoom;
+  const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
+  const timelineGridWidth = timeSlots.length * cellWidth;
+  const gridWidth = 200 + timelineGridWidth; // Sidebar (200px) + Timeline grid
   const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
 
   const currentTimeX =
@@ -344,18 +428,26 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
                       const { toggleSectorCollapse } = useStore.getState();
                       toggleSectorCollapse(group.sector!.id);
                     }}
+                    timeSlots={timeSlots}
+                    zoom={zoom}
                   />
                 )}
                 {visibleGroupTables.map((table, idx) => {
                   const tableReservations =
                     reservationsByTable.get(table.id) || [];
                   const absoluteIndex = tableIndexOffset + idx;
+                  const isLastTableInGroup =
+                    idx === visibleGroupTables.length - 1;
+                  const isLastGroup = groupIndex === groupedTables.length - 1;
+                  const isLastRow = isLastTableInGroup && isLastGroup;
+
                   return (
                     <TimelineRow
                       key={table.id}
                       table={table}
                       timeSlots={timeSlots}
                       zoom={zoom}
+                      isLastRow={isLastRow}
                     >
                       <CreateDragArea
                         configDate={config.date}

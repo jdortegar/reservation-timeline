@@ -5,6 +5,7 @@ import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/store/store';
 import { TimelineGrid } from './TimelineGrid';
+import { TimelineToolbar } from './TimelineToolbar';
 import { ReservationModal } from './ReservationModal';
 import type { Sector, Table, Reservation } from '@/lib/types/Reservation';
 
@@ -185,17 +186,22 @@ export function TimelineView() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <TimelineGrid
-        onOpenModal={(tableId, startTime, duration, reservationId) => {
-          setModalState({
-            isOpen: true,
-            tableId,
-            startTime,
-            duration,
-            reservationId,
-          });
-        }}
-      />
+      <div className="flex flex-col h-full">
+        <TimelineToolbar />
+        <div className="flex-1 overflow-hidden">
+          <TimelineGrid
+            onOpenModal={(tableId, startTime, duration, reservationId) => {
+              setModalState({
+                isOpen: true,
+                tableId,
+                startTime,
+                duration,
+                reservationId,
+              });
+            }}
+          />
+        </div>
+      </div>
       <ReservationModal
         isOpen={modalState.isOpen}
         onClose={() => setModalState({ isOpen: false })}
