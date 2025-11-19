@@ -34,8 +34,8 @@ function TimelineRowComponent({
     >
       <div className="flex" style={{ height: '100%' }}>
         <div
-          className="border-r-2 border-gray-300 bg-gray-50 flex items-center justify-center text-sm font-semibold text-gray-800 shrink-0"
-          style={{ width: 200, height: '100%' }}
+          className="border-r-2 border-gray-300 bg-gray-50 flex items-center justify-center text-sm font-semibold text-gray-800 shrink-0 select-none"
+          style={{ width: 200, height: '100%', userSelect: 'none' }}
         >
           <div className="text-center">
             <div className="font-bold">{table.name}</div>

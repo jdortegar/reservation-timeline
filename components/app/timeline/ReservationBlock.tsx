@@ -85,6 +85,9 @@ function ReservationBlockComponent({
     if (e.button !== 0) return;
     if (isCancelled) return;
 
+    // Prevent text selection during drag
+    e.preventDefault();
+
     // Check if clicking on resize handle
     const target = e.target as HTMLElement;
     if (target.dataset.resizeHandle === 'left' && onResizeStart) {

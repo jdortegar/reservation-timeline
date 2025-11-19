@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import { parseISO, addMinutes } from 'date-fns';
 import { timeToSlotIndex, slotIndexToTime } from '@/lib/helpers/time';
@@ -85,6 +85,10 @@ export function useReservationDrag({
     y: number;
   } | null>(null);
 
+  // Use refs to store latest mouse event for RAF throttling
+  const latestMouseEventRef = useRef<MouseEvent | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+
   const handleDragStart = (
     reservation: Reservation,
     e: React.MouseEvent,
@@ -92,6 +96,9 @@ export function useReservationDrag({
     originalTableIndex: number,
   ) => {
     if (reservation.status === 'CANCELLED') return;
+
+    // Prevent text selection during drag
+    e.preventDefault();
 
     const gridContainer = gridContainerRef?.current;
     if (!gridContainer) return;
@@ -120,9 +127,17 @@ export function useReservationDrag({
 
   // Handle mouse move and mouse up for drag
   useEffect(() => {
-    if (!draggingReservation) return;
+    if (!draggingReservation) {
+      // Clean up RAF if drag ends
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      latestMouseEventRef.current = null;
+      return;
+    }
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const processMouseMove = (e: MouseEvent) => {
       const gridContainer = gridContainerRef?.current;
       if (!gridContainer) return;
 
@@ -461,12 +476,33 @@ export function useReservationDrag({
       setCursorPosition(null);
     };
 
+    const handleMouseMove = (e: MouseEvent) => {
+      // Store latest mouse event
+      latestMouseEventRef.current = e;
+
+      // Schedule update via requestAnimationFrame if not already scheduled
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (latestMouseEventRef.current) {
+            processMouseMove(latestMouseEventRef.current);
+          }
+        });
+      }
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
+      // Clean up RAF
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      latestMouseEventRef.current = null;
     };
   }, [
     draggingReservation,

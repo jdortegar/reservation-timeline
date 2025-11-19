@@ -359,7 +359,14 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   );
 
   return (
-    <div ref={gridContainerRef} className="h-full overflow-auto relative">
+    <div
+      ref={gridContainerRef}
+      className="h-full overflow-auto relative"
+      style={{
+        userSelect:
+          draggingReservation || resizingReservation ? 'none' : 'auto',
+      }}
+    >
       <div
         style={{ width: gridWidth, height: gridHeight, position: 'relative' }}
       >

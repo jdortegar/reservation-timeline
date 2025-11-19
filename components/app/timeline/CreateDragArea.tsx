@@ -53,6 +53,10 @@ export function CreateDragArea({
   >(undefined);
   const areaRef = useRef<HTMLDivElement>(null);
 
+  // Use refs to store latest mouse event for RAF throttling
+  const latestMouseEventRef = useRef<MouseEvent | null>(null);
+  const rafIdRef = useRef<number | null>(null);
+
   // Reset conflict state when date changes
   useEffect(() => {
     setHasConflict(false);
@@ -79,6 +83,9 @@ export function CreateDragArea({
       return;
     }
 
+    // Prevent text selection during drag
+    e.preventDefault();
+
     const rect = areaRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -93,9 +100,17 @@ export function CreateDragArea({
   };
 
   useEffect(() => {
-    if (!isDragging) return;
+    if (!isDragging) {
+      // Clean up RAF if drag ends
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      latestMouseEventRef.current = null;
+      return;
+    }
 
-    const handleMove = (e: MouseEvent) => {
+    const processMouseMove = (e: MouseEvent) => {
       if (startSlot === null || !startPos) return;
 
       const dragDistance =
@@ -179,11 +194,32 @@ export function CreateDragArea({
       setConflictReason(undefined);
     };
 
+    const handleMove = (e: MouseEvent) => {
+      // Store latest mouse event
+      latestMouseEventRef.current = e;
+
+      // Schedule update via requestAnimationFrame if not already scheduled
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(() => {
+          rafIdRef.current = null;
+          if (latestMouseEventRef.current) {
+            processMouseMove(latestMouseEventRef.current);
+          }
+        });
+      }
+    };
+
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseup', handleUp);
     return () => {
       document.removeEventListener('mousemove', handleMove);
       document.removeEventListener('mouseup', handleUp);
+      // Clean up RAF
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      latestMouseEventRef.current = null;
     };
   }, [
     isDragging,
