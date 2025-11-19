@@ -1,28 +1,24 @@
 'use client';
 
-import { useMemo, useRef, useState, useEffect, useCallback, memo } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { List } from 'react-window';
+import type { RowComponentProps, ListImperativeAPI } from 'react-window';
 import { useStore } from '@/store/store';
-import { getTimeSlots, timeToSlotIndex } from '@/lib/helpers/time';
-import { slotToX, durationToWidth } from '@/lib/helpers/coordinates';
-import { parseISO, addMinutes } from 'date-fns';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { getTimeSlots } from '@/lib/helpers/time';
+import { slotToX } from '@/lib/helpers/coordinates';
 import { TimelineHeader } from './TimelineHeader';
-import { TimelineRow } from './TimelineRow';
-import { ReservationBlock } from './ReservationBlock';
 import { ReservationGhostBlock } from './ReservationGhostBlock';
 import { DropPreviewBlock } from './DropPreviewBlock';
 import { ResizePreviewBlock } from './ResizePreviewBlock';
-import { CreateDragArea } from './CreateDragArea';
 import { ReservationContextMenu } from './ReservationContextMenu';
+import { VirtualTimelineRow } from './VirtualTimelineRow';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { useReservationDrag } from '@/lib/hooks/useReservationDrag';
 import { useReservationResize } from '@/lib/hooks/useReservationResize';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
-import type {
-  Reservation,
-  Sector,
-  ReservationStatus,
-} from '@/lib/types/Reservation';
+import { useVirtualItems } from '@/lib/hooks/useVirtualItems';
+import { useReservationActions } from '@/lib/hooks/useReservationActions';
+import type { Reservation } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
   onOpenModal?: (
@@ -32,56 +28,6 @@ interface TimelineGridProps {
     reservationId?: string,
   ) => void;
 }
-
-const SectorHeader = memo(function SectorHeader({
-  sector,
-  isCollapsed,
-  onToggle,
-  timeSlots,
-  zoom,
-}: {
-  sector: Sector;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  timeSlots: Date[];
-  zoom: number;
-}) {
-  const cellWidth = useMemo(() => TIMELINE_CONFIG.CELL_WIDTH_PX * zoom, [zoom]);
-  const gridWidth = useMemo(
-    () => timeSlots.length * cellWidth,
-    [timeSlots.length, cellWidth],
-  );
-
-  return (
-    <div className="flex" style={{ height: 40 }}>
-      <div
-        className="border-r-2 border-gray-300 cursor-pointer hover:opacity-80 flex items-center px-4 font-semibold text-sm transition-colors shrink-0"
-        style={{
-          backgroundColor: sector.color + '20',
-          color: sector.color,
-          width: 200,
-          height: '100%',
-        }}
-        onClick={onToggle}
-      >
-        {isCollapsed ? (
-          <ChevronRight className="h-4 w-4 mr-2" />
-        ) : (
-          <ChevronDown className="h-4 w-4 mr-2" />
-        )}
-        {sector.name}
-      </div>
-      <div
-        className="border-b border-t border-r-2 border-gray-300 shrink-0 overflow-hidden"
-        style={{
-          backgroundColor: sector.color + '20',
-          width: gridWidth,
-          height: '100%',
-        }}
-      />
-    </div>
-  );
-});
 
 export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const gridContainerRef = useRef<HTMLDivElement>(null);
@@ -274,6 +220,15 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     return tables;
   }, [groupedTables, collapsedSectors, selectedSectors]);
 
+  // Use virtual items hook
+  const { virtualItems, getRowHeight, totalHeight } = useVirtualItems({
+    collapsedSectors,
+    groupedTables,
+    selectedSectors,
+  });
+
+  const listRef = useRef<ListImperativeAPI | null>(null);
+
   // Use custom hook for drag logic (after groupedTables and visibleTables are defined)
   // Use full reservations array for conflict checking, but filtered for display
   const { draggingReservation, ghostPreview, dropPreview, handleDragStart } =
@@ -304,115 +259,30 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       zoom,
     });
 
-  // Context menu handlers
-  const handleContextMenu = (e: React.MouseEvent, reservation: Reservation) => {
-    setContextMenu({
-      reservation,
-      position: { x: e.clientX, y: e.clientY },
-    });
-  };
+  // Use reservation actions hook
+  const {
+    handleEdit,
+    handleChangeStatus,
+    handleMarkNoShow,
+    handleCancel,
+    handleDuplicate,
+    handleDelete,
+    handleDeleteMultiple,
+    handleCopy,
+    handlePaste,
+    handleDuplicateMultiple,
+  } = useReservationActions({ onOpenModal });
 
-  const handleEdit = (reservation: Reservation) => {
-    if (onOpenModal) {
-      onOpenModal(
-        reservation.tableId,
-        reservation.startTime,
-        reservation.durationMinutes,
-        reservation.id,
-      );
-    }
-  };
-
-  const handleChangeStatus = (
-    reservationId: string,
-    status: ReservationStatus,
-  ) => {
-    saveToHistory();
-    updateReservation(reservationId, { status });
-  };
-
-  const handleMarkNoShow = (reservationId: string) => {
-    saveToHistory();
-    updateReservation(reservationId, { status: 'NO_SHOW' });
-  };
-
-  const handleCancel = (reservationId: string) => {
-    saveToHistory();
-    updateReservation(reservationId, { status: 'CANCELLED' });
-  };
-
-  const handleDuplicate = (reservation: Reservation) => {
-    saveToHistory();
-    // Duplicate reservation - add 1 hour to start time
-    const newStartTime = addMinutes(parseISO(reservation.startTime), 60);
-    const newEndTime = addMinutes(newStartTime, reservation.durationMinutes);
-
-    const duplicatedReservation: Reservation = {
-      ...reservation,
-      id: `RES_${Date.now()}`,
-      startTime: newStartTime.toISOString(),
-      endTime: newEndTime.toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    addReservation(duplicatedReservation);
-    selectReservation(duplicatedReservation.id);
-  };
-
-  const handleDelete = (reservationId: string) => {
-    saveToHistory();
-    deleteReservation(reservationId);
-  };
-
-  const handleDeleteMultiple = useCallback(
-    (reservationIds: string[]) => {
-      saveToHistory();
-      deleteReservations(reservationIds);
+  // Context menu handler
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, reservation: Reservation) => {
+      setContextMenu({
+        reservation,
+        position: { x: e.clientX, y: e.clientY },
+      });
     },
-    [saveToHistory, deleteReservations],
+    [],
   );
-
-  const handleCopy = useCallback(
-    (reservationsToCopy: Reservation[]) => {
-      copyReservations(reservationsToCopy);
-    },
-    [copyReservations],
-  );
-
-  const handlePaste = useCallback(() => {
-    // Paste at current time or first selected reservation's time
-    const targetStartTime =
-      selectedReservationIds.length > 0
-        ? reservations.find((r) => r.id === selectedReservationIds[0])
-            ?.startTime
-        : undefined;
-    saveToHistory();
-    pasteReservations(undefined, targetStartTime);
-  }, [selectedReservationIds, reservations, saveToHistory, pasteReservations]);
-
-  const handleDuplicateMultiple = (reservationIds: string[]) => {
-    const reservationsToDuplicate = reservations.filter((r) =>
-      reservationIds.includes(r.id),
-    );
-    saveToHistory();
-
-    reservationsToDuplicate.forEach((reservation) => {
-      const newStartTime = addMinutes(parseISO(reservation.startTime), 60);
-      const newEndTime = addMinutes(newStartTime, reservation.durationMinutes);
-
-      const duplicatedReservation: Reservation = {
-        ...reservation,
-        id: `RES_${Date.now()}_${reservation.id}`,
-        startTime: newStartTime.toISOString(),
-        endTime: newEndTime.toISOString(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      addReservation(duplicatedReservation);
-    });
-  };
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -430,11 +300,63 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
   const timelineGridWidth = timeSlots.length * cellWidth;
   const gridWidth = 200 + timelineGridWidth; // Sidebar (200px) + Timeline grid
-  const gridHeight = visibleTables.length * 60 + groupedTables.length * 40 + 70;
-  const contentHeight = visibleTables.length * 60 + groupedTables.length * 40; // Height below header
+  const contentHeight = totalHeight; // Height below header
+  const gridHeight = contentHeight + 70; // Content + header
 
   const currentTimeX =
     currentTimeSlot >= 0 ? slotToX(currentTimeSlot, zoom) : null;
+
+  // Row component for virtual list
+  const RowComponent = useCallback(
+    ({ index, style }: RowComponentProps) => {
+      const item = virtualItems[index];
+      if (!item) {
+        return <div style={style} />;
+      }
+
+      return (
+        <VirtualTimelineRow
+          collapsedSectors={collapsedSectors}
+          configDate={config.date}
+          configTimezone={config.timezone}
+          draggingReservation={draggingReservation}
+          index={index}
+          item={item}
+          onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
+          onOpenModal={onOpenModal}
+          onResizeStart={handleResizeStart}
+          reservations={reservations}
+          reservationsByTable={reservationsByTable}
+          resizingReservation={resizingReservation}
+          resizePreview={resizePreview}
+          selectedReservationIds={selectedReservationIds}
+          style={style}
+          timeSlots={timeSlots}
+          virtualItems={virtualItems}
+          zoom={zoom}
+        />
+      );
+    },
+    [
+      virtualItems,
+      collapsedSectors,
+      config.date,
+      config.timezone,
+      draggingReservation,
+      handleContextMenu,
+      handleDragStart,
+      handleResizeStart,
+      onOpenModal,
+      reservations,
+      reservationsByTable,
+      resizingReservation,
+      resizePreview,
+      selectedReservationIds,
+      timeSlots,
+      zoom,
+    ],
+  );
 
   return (
     <div ref={gridContainerRef} className="h-full overflow-auto relative">
@@ -453,146 +375,25 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
               left: 200 + currentTimeX,
               top: 70,
               width: 2,
-              height: Math.max(0, contentHeight), // Extend to bottom of table (all content below header)
+              height: Math.max(0, contentHeight),
               backgroundColor: '#EF4444',
             }}
           />
         )}
-        <div className="relative">
-          {groupedTables.map((group, groupIndex) => {
-            const isCollapsed =
-              group.sector && collapsedSectors.includes(group.sector.id);
-            const visibleGroupTables = isCollapsed ? [] : group.tables;
-            let tableIndexOffset = 0;
-
-            for (let i = 0; i < groupIndex; i++) {
-              if (
-                !collapsedSectors.includes(groupedTables[i].sector?.id || '')
-              ) {
-                tableIndexOffset += groupedTables[i].tables.length;
-              }
-            }
-
-            return (
-              <div key={group.sector?.id || 'no-sector'}>
-                {group.sector && (
-                  <SectorHeader
-                    sector={group.sector}
-                    isCollapsed={isCollapsed || false}
-                    onToggle={() => {
-                      const { toggleSectorCollapse } = useStore.getState();
-                      toggleSectorCollapse(group.sector!.id);
-                    }}
-                    timeSlots={timeSlots}
-                    zoom={zoom}
-                  />
-                )}
-                {visibleGroupTables.map((table, idx) => {
-                  const tableReservations =
-                    reservationsByTable.get(table.id) || [];
-                  const absoluteIndex = tableIndexOffset + idx;
-                  const isLastTableInGroup =
-                    idx === visibleGroupTables.length - 1;
-                  const isLastGroup = groupIndex === groupedTables.length - 1;
-                  const isLastRow = isLastTableInGroup && isLastGroup;
-
-                  return (
-                    <TimelineRow
-                      key={table.id}
-                      table={table}
-                      timeSlots={timeSlots}
-                      zoom={zoom}
-                      isLastRow={isLastRow}
-                    >
-                      <CreateDragArea
-                        configDate={config.date}
-                        configTimezone={config.timezone}
-                        defaultPartySize={2}
-                        isDragActive={!!draggingReservation}
-                        isResizeActive={!!resizingReservation}
-                        onDragComplete={(tableId, startTime, duration) => {
-                          if (onOpenModal) {
-                            onOpenModal(tableId, startTime, duration);
-                          }
-                        }}
-                        reservations={reservations}
-                        table={table}
-                        timeSlots={timeSlots}
-                        zoom={zoom}
-                      />
-                      {tableReservations.map((reservation) => {
-                        const startTime = parseISO(reservation.startTime);
-                        const slotIndex = timeToSlotIndex(
-                          startTime,
-                          config.date,
-                        );
-                        const x = slotToX(slotIndex, zoom);
-                        const width = durationToWidth(
-                          reservation.durationMinutes,
-                          zoom,
-                        );
-                        const isSelected = selectedReservationIds.includes(
-                          reservation.id,
-                        );
-
-                        const isDragging =
-                          draggingReservation?.reservation.id ===
-                          reservation.id;
-                        const isResizing =
-                          resizingReservation?.reservation.id ===
-                          reservation.id;
-
-                        return (
-                          <ReservationBlock
-                            key={reservation.id}
-                            allReservations={reservations}
-                            configTimezone={config.timezone}
-                            isDragging={isDragging}
-                            isSelected={isSelected}
-                            onDragStart={(e: React.MouseEvent) => {
-                              handleDragStart(reservation, e, x, absoluteIndex);
-                            }}
-                            onResizeStart={(
-                              e: React.MouseEvent,
-                              edge: 'left' | 'right',
-                            ) => {
-                              handleResizeStart(reservation, edge, e, x);
-                            }}
-                            onContextMenu={handleContextMenu}
-                            onSelect={(e: React.MouseEvent) => {
-                              const { selectReservation } = useStore.getState();
-                              selectReservation(
-                                reservation.id,
-                                e.metaKey || e.ctrlKey,
-                              );
-                            }}
-                            reservation={reservation}
-                            style={{
-                              position: 'absolute',
-                              left:
-                                isResizing && resizePreview
-                                  ? resizePreview.left - 200
-                                  : x,
-                              top: 0,
-                              width:
-                                isResizing && resizePreview
-                                  ? resizePreview.width
-                                  : width,
-                              height: 60,
-                              opacity: isResizing ? 0.7 : 1,
-                            }}
-                            table={table}
-                            zoom={zoom}
-                          />
-                        );
-                      })}
-                    </TimelineRow>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
+        <List
+          listRef={listRef}
+          rowCount={virtualItems.length}
+          rowHeight={getRowHeight}
+          rowComponent={RowComponent}
+          rowProps={{}}
+          style={{
+            position: 'absolute',
+            top: 70, // Below header
+            left: 0,
+            height: contentHeight,
+            width: gridWidth,
+          }}
+        />
         {/* Ghost Preview - follows cursor exactly */}
         {ghostPreview && draggingReservation && (
           <ReservationGhostBlock
