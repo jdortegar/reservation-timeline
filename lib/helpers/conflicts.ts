@@ -6,6 +6,34 @@ import type {
 import { parseISO, isBefore, isAfter } from 'date-fns';
 import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 
+/**
+ * Conflict Detection Algorithms
+ *
+ * These functions detect various types of conflicts when creating or updating reservations:
+ * 1. Time overlap: Two reservations on the same table with overlapping time ranges
+ * 2. Capacity: Party size outside table's min/max capacity range
+ * 3. Service hours: Reservation outside restaurant operating hours
+ *
+ * All checks are performed independently and can be combined via checkAllConflicts().
+ */
+
+/**
+ * Detects time overlap conflicts between reservations on the same table.
+ *
+ * Algorithm:
+ * Two time ranges overlap if any of these conditions are true:
+ * 1. New start is within existing range: start > existingStart && start < existingEnd
+ * 2. Existing start is within new range: existingStart > start && existingStart < end
+ * 3. Exact match: start === existingStart && end === existingEnd
+ * 4. General overlap: start < existingEnd && end > existingStart
+ *
+ * Time Complexity: O(n) where n = number of reservations on the same table
+ *
+ * @param reservation - The reservation to check
+ * @param existingReservations - All existing reservations to check against
+ * @param excludeId - Optional ID to exclude from conflict check (useful when editing)
+ * @returns ConflictCheck with hasConflict flag and list of conflicting reservation IDs
+ */
 export function checkOverlap(
   reservation: Reservation,
   existingReservations: Reservation[],
@@ -16,17 +44,24 @@ export function checkOverlap(
   const conflictingIds: string[] = [];
 
   for (const existing of existingReservations) {
+    // Skip excluded reservation (e.g., when editing the same reservation)
     if (excludeId && existing.id === excludeId) continue;
+    // Only check reservations on the same table
     if (existing.tableId !== reservation.tableId) continue;
 
     const existingStart = parseISO(existing.startTime);
     const existingEnd = parseISO(existing.endTime);
 
+    // Check all possible overlap scenarios
     const overlaps =
+      // New reservation starts during existing reservation
       (isAfter(start, existingStart) && isBefore(start, existingEnd)) ||
+      // Existing reservation starts during new reservation
       (isAfter(existingStart, start) && isBefore(existingStart, end)) ||
+      // Exact time match
       (start.getTime() === existingStart.getTime() &&
         end.getTime() === existingEnd.getTime()) ||
+      // General overlap case (covers all other scenarios)
       (start.getTime() < existingEnd.getTime() &&
         end.getTime() > existingStart.getTime());
 
@@ -88,12 +123,30 @@ export function checkServiceHours(
   };
 }
 
+/**
+ * Performs all conflict checks in sequence with early return optimization.
+ *
+ * Algorithm:
+ * Checks are performed in order of likelihood and severity:
+ * 1. Time overlap (most common conflict)
+ * 2. Capacity (quick check, no iteration needed)
+ * 3. Service hours (final validation)
+ *
+ * Early return on first conflict found to optimize performance.
+ *
+ * @param reservation - The reservation to validate
+ * @param existingReservations - All existing reservations
+ * @param table - The table for the reservation
+ * @param excludeId - Optional ID to exclude from overlap check
+ * @returns ConflictCheck with the first conflict found, or no conflict
+ */
 export function checkAllConflicts(
   reservation: Reservation,
   existingReservations: Reservation[],
   table: Table,
   excludeId?: string,
 ): ConflictCheck {
+  // Check overlap first (most common conflict type)
   const overlapCheck = checkOverlap(
     reservation,
     existingReservations,
@@ -101,15 +154,18 @@ export function checkAllConflicts(
   );
   if (overlapCheck.hasConflict) return overlapCheck;
 
+  // Check capacity (quick validation)
   const capacityCheck = checkCapacity(reservation.partySize, table);
   if (capacityCheck.hasConflict) return capacityCheck;
 
+  // Check service hours (final validation)
   const hoursCheck = checkServiceHours(
     reservation.startTime,
     reservation.endTime,
   );
   if (hoursCheck.hasConflict) return hoursCheck;
 
+  // No conflicts found
   return {
     hasConflict: false,
     conflictingReservationIds: [],

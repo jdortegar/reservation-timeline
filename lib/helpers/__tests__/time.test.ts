@@ -14,8 +14,9 @@ describe('Time Helper Functions', () => {
       const date = '2025-11-18';
       const slots = getTimeSlots(date);
 
-      // Should have 52 slots: 11:00-23:45 (13 hours × 4 slots) + 00:00
-      expect(slots.length).toBe(52);
+      // Should have 53 slots: 11:00-23:45 (13 hours × 4 slots = 52) + 00:00 (1 slot)
+      // 13 hours from 11:00 to 23:59 = 13 × 4 = 52 slots, plus 00:00 = 53 total
+      expect(slots.length).toBe(53);
     });
 
     it('should start at 11:00 and end at 00:00', () => {
