@@ -36,7 +36,7 @@ interface VirtualTimelineRowProps {
   } | null;
   selectedReservationIds: string[];
   focusedReservationId?: string | null;
-  focusedReservationRef?: React.RefObject<HTMLDivElement>;
+  focusedReservationRef?: React.MutableRefObject<HTMLDivElement | null>;
   reservations: Reservation[];
   onOpenModal?: (
     tableId?: string,

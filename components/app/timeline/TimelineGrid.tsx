@@ -24,6 +24,7 @@ import { checkAllConflicts } from '@/lib/helpers/conflicts';
 import type { Reservation } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
+  gridContainerRef?: React.RefObject<HTMLDivElement>;
   onOpenModal?: (
     tableId?: string,
     startTime?: string,
@@ -32,8 +33,12 @@ interface TimelineGridProps {
   ) => void;
 }
 
-export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
-  const gridContainerRef = useRef<HTMLDivElement>(null);
+export function TimelineGrid({
+  gridContainerRef: externalRef,
+  onOpenModal,
+}: TimelineGridProps) {
+  const internalRef = useRef<HTMLDivElement>(null);
+  const gridContainerRef = externalRef || internalRef;
   const [contextMenu, setContextMenu] = useState<{
     reservation: Reservation;
     position: { x: number; y: number };
@@ -304,59 +309,55 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
   });
 
   // Keyboard navigation
-  const {
-    focusedReservationId,
-    setFocusedReservation,
-    focusedReservationRef,
-  } = useKeyboardNavigation({
-    configDate: config.date,
-    configTimezone: config.timezone,
-    enabled: !contextMenu,
-    onOpenModal,
-    onSelectReservation: (id, addToSelection) => {
-      selectReservation(id, addToSelection);
-      const reservation = reservations.find((r) => r.id === id);
-      if (reservation) {
-        const table = tables.find((t) => t.id === reservation.tableId);
-        if (table) {
-          const conflictCheck = checkAllConflicts(
-            reservation,
-            reservations,
-            table,
-            reservation.id,
-          );
-          if (conflictCheck.hasConflict) {
-            announce(
-              `Reservation for ${reservation.customer.name} selected. Warning: This reservation has a conflict.`,
-              { priority: 'assertive' },
+  const { focusedReservationId, setFocusedReservation, focusedReservationRef } =
+    useKeyboardNavigation({
+      configDate: config.date,
+      configTimezone: config.timezone,
+      enabled: !contextMenu,
+      onOpenModal,
+      onSelectReservation: (id, addToSelection) => {
+        selectReservation(id, addToSelection);
+        const reservation = reservations.find((r) => r.id === id);
+        if (reservation) {
+          const table = tables.find((t) => t.id === reservation.tableId);
+          if (table) {
+            const conflictCheck = checkAllConflicts(
+              reservation,
+              reservations,
+              table,
+              reservation.id,
             );
+            if (conflictCheck.hasConflict) {
+              announce(
+                `Reservation for ${reservation.customer.name} selected. Warning: This reservation has a conflict.`,
+                { priority: 'assertive' },
+              );
+            } else {
+              announce(
+                `Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, selected.`,
+                { priority: 'polite' },
+              );
+            }
           } else {
             announce(
               `Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, selected.`,
               { priority: 'polite' },
             );
           }
-        } else {
-          announce(
-            `Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, selected.`,
-            { priority: 'polite' },
-          );
         }
-      }
-    },
-    reservations,
-    selectedReservationIds,
-    tables,
-  });
+      },
+      reservations,
+      selectedReservationIds,
+      tables,
+    });
 
   // Announce when reservations change
   useEffect(() => {
     if (selectedReservationIds.length > 0) {
       const count = selectedReservationIds.length;
-      announce(
-        `${count} reservation${count > 1 ? 's' : ''} selected.`,
-        { priority: 'polite' },
-      );
+      announce(`${count} reservation${count > 1 ? 's' : ''} selected.`, {
+        priority: 'polite',
+      });
     }
   }, [selectedReservationIds, announce]);
 
@@ -378,29 +379,29 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       }
 
       return (
-      <VirtualTimelineRow
-        collapsedSectors={collapsedSectors}
-        configDate={config.date}
-        configTimezone={config.timezone}
-        draggingReservation={draggingReservation}
-        focusedReservationId={focusedReservationId}
-        focusedReservationRef={focusedReservationRef}
-        index={index}
-        item={item}
-        onContextMenu={handleContextMenu}
-        onDragStart={handleDragStart}
-        onOpenModal={onOpenModal}
-        onResizeStart={handleResizeStart}
-        reservations={reservations}
-        reservationsByTable={reservationsByTable}
-        resizingReservation={resizingReservation}
-        resizePreview={resizePreview}
-        selectedReservationIds={selectedReservationIds}
-        style={style}
-        timeSlots={timeSlots}
-        virtualItems={virtualItems}
-        zoom={zoom}
-      />
+        <VirtualTimelineRow
+          collapsedSectors={collapsedSectors}
+          configDate={config.date}
+          configTimezone={config.timezone}
+          draggingReservation={draggingReservation}
+          focusedReservationId={focusedReservationId}
+          focusedReservationRef={focusedReservationRef}
+          index={index}
+          item={item}
+          onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
+          onOpenModal={onOpenModal}
+          onResizeStart={handleResizeStart}
+          reservations={reservations}
+          reservationsByTable={reservationsByTable}
+          resizingReservation={resizingReservation}
+          resizePreview={resizePreview}
+          selectedReservationIds={selectedReservationIds}
+          style={style}
+          timeSlots={timeSlots}
+          virtualItems={virtualItems}
+          zoom={zoom}
+        />
       );
     },
     [

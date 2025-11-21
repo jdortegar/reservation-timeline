@@ -15,7 +15,7 @@ interface ReservationBlockProps {
   isSelected?: boolean;
   isFocused?: boolean;
   isDragging?: boolean;
-  focusedReservationRef?: React.RefObject<HTMLDivElement>;
+  focusedReservationRef?: React.MutableRefObject<HTMLDivElement | null>;
   onSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.MouseEvent) => void;
   onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
@@ -186,7 +186,7 @@ function ReservationBlockComponent({
         ref={(node) => {
           blockRef.current = node;
           if (focusedReservationRef && node) {
-            (focusedReservationRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            focusedReservationRef.current = node;
           }
         }}
         data-reservation-block

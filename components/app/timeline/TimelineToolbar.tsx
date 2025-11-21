@@ -31,6 +31,9 @@ import {
 } from 'lucide-react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import { HighContrastToggle } from '@/components/ui/HighContrastToggle';
+import { ExportMenu } from './ExportMenu';
+import { StatisticsPanel } from './StatisticsPanel';
+import { BarChart3 } from 'lucide-react';
 import type { ReservationStatus } from '@/lib/types/Reservation';
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5];
@@ -46,7 +49,7 @@ interface TimelineToolbarProps {
   onImportCSV?: () => void;
 }
 
-export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
+export function TimelineToolbar({ gridContainerRef, onImportCSV }: TimelineToolbarProps = {}) {
   const {
     config,
     sectors,
@@ -60,6 +63,7 @@ export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
     setSelectedStatuses,
     setSearchQuery,
   } = useStore();
+  const [isStatisticsOpen, setIsStatisticsOpen] = useState(false);
 
   // Local state for search input (immediate UI update)
   const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
@@ -396,6 +400,20 @@ export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
             {/* High Contrast Toggle */}
             <HighContrastToggle />
 
+            {/* Statistics Button */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsStatisticsOpen(true)}
+              title="View statistics"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Stats
+            </Button>
+
+            {/* Export Menu */}
+            <ExportMenu gridContainerRef={gridContainerRef} />
+
             {/* Import CSV Button */}
             {onImportCSV && (
               <Button
@@ -409,6 +427,10 @@ export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
               </Button>
             )}
           </div>
+          <StatisticsPanel
+            isOpen={isStatisticsOpen}
+            onClose={() => setIsStatisticsOpen(false)}
+          />
         </div>
       </div>
     </div>

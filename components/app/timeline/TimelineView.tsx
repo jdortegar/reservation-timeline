@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useStore } from '@/store/store';
@@ -169,6 +169,7 @@ const HARDCODED_RESERVATIONS: Reservation[] = [
 export function TimelineView() {
   const { config, setSectors, setTables, setReservations, setConfig } =
     useStore();
+  const gridContainerRef = useRef<HTMLDivElement>(null);
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     tableId?: string;
@@ -247,9 +248,13 @@ export function TimelineView() {
         className="flex flex-col h-full"
         data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
       >
-        <TimelineToolbar onImportCSV={() => setIsCSVImportOpen(true)} />
+        <TimelineToolbar
+          gridContainerRef={gridContainerRef}
+          onImportCSV={() => setIsCSVImportOpen(true)}
+        />
         <div className="flex-1 overflow-hidden">
           <TimelineGrid
+            gridContainerRef={gridContainerRef}
             onOpenModal={(tableId, startTime, duration, reservationId) => {
               setModalState({
                 isOpen: true,

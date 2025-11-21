@@ -132,3 +132,37 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide non-essential UI elements */
+  header,
+  nav,
+  button:not(.print-keep),
+  [role='toolbar'],
+  [data-print-hide='true'] {
+    display: none !important;
+  }
+
+  /* Optimize layout for printing */
+  body {
+    background: white;
+    color: black;
+  }
+
+  /* Page breaks */
+  .print-page-break {
+    page-break-after: always;
+  }
+
+  /* Ensure timeline is visible */
+  .timeline-grid {
+    overflow: visible !important;
+  }
+
+  /* Remove shadows and borders for cleaner print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
