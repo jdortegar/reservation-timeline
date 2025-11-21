@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+
 import type { RefObject } from 'react';
 import { parseISO, addMinutes } from 'date-fns';
 import { timeToSlotIndex, slotIndexToTime } from '@/lib/helpers/time';
@@ -94,6 +95,14 @@ export function useReservationDrag({
   // Use refs to store latest mouse event for RAF throttling
   const latestMouseEventRef = useRef<MouseEvent | null>(null);
   const rafIdRef = useRef<number | null>(null);
+
+  // Cache for conflict checks to avoid recalculating on every mouse move
+  // Only recalculate when slot or table index actually changes
+  const conflictCacheRef = useRef<{
+    slotIndex: number;
+    tableIndex: number;
+    result: ReturnType<typeof checkAllConflicts>;
+  } | null>(null);
 
   const handleDragStart = (
     reservation: Reservation,
@@ -694,6 +703,8 @@ export function useReservationDrag({
       setGhostPreview(null);
       setDropPreview(null);
       setCursorPosition(null);
+      // Clear conflict cache when drag ends
+      conflictCacheRef.current = null;
     };
 
     const handleMouseMove = (e: MouseEvent) => {

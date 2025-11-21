@@ -2,9 +2,12 @@
 
 A modern, high-performance restaurant reservation management system built with Next.js, React, and TypeScript. Features an interactive timeline view for managing table reservations with drag-and-drop, real-time conflict detection, and comprehensive accessibility support.
 
+🌐 **[Live Demo](https://reservation-timeline-chi.vercel.app/)** - Try it now!
+
 ## Features
 
 - 📅 **Interactive Timeline View** - Visual grid-based timeline for managing reservations
+- 🧪 **Comprehensive Testing** - Full test coverage with Vitest and Testing Library
 - 🖱️ **Drag & Drop** - Move reservations between tables and time slots
 - 🔄 **Resize Reservations** - Adjust duration by dragging reservation edges
 - ⚠️ **Real-time Conflict Detection** - Automatic detection of overlaps, capacity issues, and service hours violations
@@ -57,11 +60,33 @@ npm start
 
 ### Testing
 
+The project includes comprehensive test coverage for core functionality:
+
+- **Unit Tests** - Helper functions (conflicts, coordinates, time calculations)
+- **Integration Tests** - Reservation creation, filtering, drag & drop, resize operations
+- **Test Files** - Located in `lib/helpers/__tests__/`
+
+**Run Tests:**
+
 ```bash
-npm test              # Run tests
-npm run test:ui       # Run tests with UI
-npm run test:coverage # Run tests with coverage
+npm test              # Run all tests in watch mode
+npm run test:ui       # Run tests with interactive UI (Vitest UI)
+npm run test:coverage # Run tests with coverage report
 ```
+
+**Test Coverage:**
+
+- ✅ Conflict detection (overlap, capacity, service hours)
+- ✅ Coordinate transformations (slot ↔ x, table ↔ y)
+- ✅ Time calculations (slots, durations, ranges)
+- ✅ Reservation creation and validation
+- ✅ Filtering operations (by sector, status, search)
+- ✅ Drag & drop operations
+- ✅ Resize operations
+
+**Writing Tests:**
+
+Tests are written using Vitest and Testing Library. Follow the existing test patterns in `lib/helpers/__tests__/`.
 
 ## Technology Choices and Justifications
 
@@ -492,6 +517,25 @@ function checkAllConflicts(
 - Requires ES2020+ features
 - CSS Grid and Flexbox required
 - No IE11 support
+
+### Live Demo
+
+🌐 **Try it now:** [https://reservation-timeline-chi.vercel.app/](https://reservation-timeline-chi.vercel.app/)
+
+The live demo is hosted on Vercel and includes all features:
+- Interactive timeline with drag & drop
+- Real-time conflict detection
+- Export & reporting functionality
+- Full keyboard navigation
+- Accessibility features
+
+**Local Development:**
+
+To run locally:
+1. Clone the repository
+2. Follow the [Setup Instructions](#setup-instructions) above
+3. Run `npm run dev`
+4. Open [http://localhost:3000](http://localhost:3000)
 
 ## Screenshots
 

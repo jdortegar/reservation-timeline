@@ -16,10 +16,23 @@ export const createReservationSchema = (tables: Table[]) => {
     status: z.enum(['PENDING', 'CONFIRMED', 'SEATED', 'FINISHED', 'NO_SHOW', 'CANCELLED']),
     priority: z.enum(['STANDARD', 'VIP', 'LARGE_GROUP']),
     notes: z.string().optional(),
-  }).refine(
+  })
+  // Validate that tableId corresponds to an existing table
+  .refine(
     (data) => {
       const table = tables.find((t) => t.id === data.tableId);
-      if (!table) return true;
+      return table !== undefined;
+    },
+    {
+      message: 'Selected table does not exist',
+      path: ['tableId'],
+    }
+  )
+  // Validate party size is within table capacity
+  .refine(
+    (data) => {
+      const table = tables.find((t) => t.id === data.tableId);
+      if (!table) return false; // Already validated above, but TypeScript needs this
       return data.partySize >= table.capacity.min && data.partySize <= table.capacity.max;
     },
     {
