@@ -13,7 +13,9 @@ interface ReservationBlockProps {
   reservation: Reservation;
   style?: React.CSSProperties;
   isSelected?: boolean;
+  isFocused?: boolean;
   isDragging?: boolean;
+  focusedReservationRef?: React.RefObject<HTMLDivElement>;
   onSelect?: (e: React.MouseEvent) => void;
   onDragStart?: (e: React.MouseEvent) => void;
   onResizeStart?: (e: React.MouseEvent, edge: 'left' | 'right') => void;
@@ -28,7 +30,9 @@ function ReservationBlockComponent({
   reservation,
   style,
   isSelected,
+  isFocused = false,
   isDragging: isDraggingProp = false,
+  focusedReservationRef,
   onSelect,
   onDragStart,
   onResizeStart,
@@ -88,13 +92,15 @@ function ReservationBlockComponent({
     const conflictText = hasConflict
       ? 'Warning: This reservation has a conflict. '
       : '';
-    return `${conflictText}Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, ${timeRange}, Status: ${statusText}. Use arrow keys to move, Enter or Space to select, right-click for menu.`;
+    const tableName = table?.name || 'Unknown table';
+    return `${conflictText}Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, ${timeRange}, Table ${tableName}, Status: ${statusText}. Use arrow keys to navigate, Enter to edit, Space to select, right-click for menu.`;
   }, [
     reservation.customer.name,
     reservation.partySize,
     timeRange,
     reservation.status,
     hasConflict,
+    table?.name,
   ]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -130,9 +136,18 @@ function ReservationBlockComponent({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (isCancelled) return;
 
-    // Enter or Space to select
-    if (e.key === 'Enter' || e.key === ' ') {
+    // Enter to edit
+    if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
+      // Let the parent handle opening the modal
+      return;
+    }
+
+    // Space to select
+    if (e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
       if (onSelect) {
         // Create a synthetic mouse event for compatibility
         const syntheticEvent = {
@@ -145,11 +160,11 @@ function ReservationBlockComponent({
       return;
     }
 
-    // Arrow keys for navigation (could be extended for drag in future)
-    // For now, just prevent default to avoid scrolling
+    // Arrow keys are handled by parent navigation hook
+    // Just prevent default to avoid scrolling
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
       e.preventDefault();
-      // Future: Could implement keyboard-based drag here
+      e.stopPropagation();
     }
   };
 
@@ -168,10 +183,15 @@ function ReservationBlockComponent({
   return (
     <>
       <div
-        ref={blockRef}
+        ref={(node) => {
+          blockRef.current = node;
+          if (focusedReservationRef && node) {
+            (focusedReservationRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+          }
+        }}
         data-reservation-block
         role="button"
-        tabIndex={isCancelled ? -1 : 0}
+        tabIndex={isCancelled ? -1 : isFocused ? 0 : -1}
         aria-label={ariaLabel}
         aria-selected={isSelected}
         aria-disabled={isCancelled}
@@ -179,6 +199,7 @@ function ReservationBlockComponent({
           'absolute rounded px-2 py-1 text-white text-xs shadow-lg border',
           !isDraggingProp && 'transition-all',
           isSelected && 'ring-2 ring-blue-500 ring-offset-1',
+          isFocused && !isSelected && 'ring-2 ring-yellow-400 ring-offset-1',
           isCancelled && 'opacity-60',
           !isCancelled &&
             'cursor-move focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
@@ -209,6 +230,12 @@ function ReservationBlockComponent({
           setHasDragged(false);
         }}
         onKeyDown={handleKeyDown}
+        onFocus={() => {
+          // Ensure focused reservation is visible
+          requestAnimationFrame(() => {
+            blockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        }}
         onMouseDown={handleMouseDown}
         onMouseEnter={(e) => {
           if (!isDraggingProp) {

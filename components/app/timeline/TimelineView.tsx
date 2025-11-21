@@ -8,6 +8,9 @@ import { TimelineGrid } from './TimelineGrid';
 import { TimelineToolbar } from './TimelineToolbar';
 import { ReservationModal } from './ReservationModal';
 import { CSVImportModal } from './CSVImportModal';
+import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { LiveRegion } from './LiveRegion';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { Sector, Table, Reservation } from '@/lib/types/Reservation';
 
 const SEED_SECTORS: Sector[] = [
@@ -174,6 +177,33 @@ export function TimelineView() {
     reservationId?: string;
   }>({ isOpen: false });
   const [isCSVImportOpen, setIsCSVImportOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
+
+  // Keyboard shortcut to open shortcuts modal
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if typing in inputs
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target instanceof HTMLElement && e.target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === '?') {
+        setIsShortcutsModalOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     // Only run on client to avoid hydration mismatch
@@ -213,7 +243,10 @@ export function TimelineView() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="flex flex-col h-full">
+      <div
+        className="flex flex-col h-full"
+        data-reduced-motion={prefersReducedMotion ? 'true' : 'false'}
+      >
         <TimelineToolbar onImportCSV={() => setIsCSVImportOpen(true)} />
         <div className="flex-1 overflow-hidden">
           <TimelineGrid
@@ -240,6 +273,10 @@ export function TimelineView() {
       <CSVImportModal
         isOpen={isCSVImportOpen}
         onClose={() => setIsCSVImportOpen(false)}
+      />
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
       />
     </DndProvider>
   );

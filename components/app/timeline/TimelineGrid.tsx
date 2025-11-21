@@ -16,8 +16,11 @@ import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import { useReservationDrag } from '@/lib/hooks/useReservationDrag';
 import { useReservationResize } from '@/lib/hooks/useReservationResize';
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts';
+import { useKeyboardNavigation } from '@/lib/hooks/useKeyboardNavigation';
+import { useScreenReaderAnnounce } from '@/lib/hooks/useScreenReaderAnnounce';
 import { useVirtualItems } from '@/lib/hooks/useVirtualItems';
 import { useReservationActions } from '@/lib/hooks/useReservationActions';
+import { checkAllConflicts } from '@/lib/helpers/conflicts';
 import type { Reservation } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
@@ -284,6 +287,9 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     [],
   );
 
+  // Screen reader announcements
+  const { announce } = useScreenReaderAnnounce();
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     enabled: !contextMenu, // Disable when context menu is open
@@ -296,6 +302,63 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
     reservations,
     selectedReservationIds,
   });
+
+  // Keyboard navigation
+  const {
+    focusedReservationId,
+    setFocusedReservation,
+    focusedReservationRef,
+  } = useKeyboardNavigation({
+    configDate: config.date,
+    configTimezone: config.timezone,
+    enabled: !contextMenu,
+    onOpenModal,
+    onSelectReservation: (id, addToSelection) => {
+      selectReservation(id, addToSelection);
+      const reservation = reservations.find((r) => r.id === id);
+      if (reservation) {
+        const table = tables.find((t) => t.id === reservation.tableId);
+        if (table) {
+          const conflictCheck = checkAllConflicts(
+            reservation,
+            reservations,
+            table,
+            reservation.id,
+          );
+          if (conflictCheck.hasConflict) {
+            announce(
+              `Reservation for ${reservation.customer.name} selected. Warning: This reservation has a conflict.`,
+              { priority: 'assertive' },
+            );
+          } else {
+            announce(
+              `Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, selected.`,
+              { priority: 'polite' },
+            );
+          }
+        } else {
+          announce(
+            `Reservation for ${reservation.customer.name}, ${reservation.partySize} guests, selected.`,
+            { priority: 'polite' },
+          );
+        }
+      }
+    },
+    reservations,
+    selectedReservationIds,
+    tables,
+  });
+
+  // Announce when reservations change
+  useEffect(() => {
+    if (selectedReservationIds.length > 0) {
+      const count = selectedReservationIds.length;
+      announce(
+        `${count} reservation${count > 1 ? 's' : ''} selected.`,
+        { priority: 'polite' },
+      );
+    }
+  }, [selectedReservationIds, announce]);
 
   const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
   const timelineGridWidth = timeSlots.length * cellWidth;
@@ -315,27 +378,29 @@ export function TimelineGrid({ onOpenModal }: TimelineGridProps) {
       }
 
       return (
-        <VirtualTimelineRow
-          collapsedSectors={collapsedSectors}
-          configDate={config.date}
-          configTimezone={config.timezone}
-          draggingReservation={draggingReservation}
-          index={index}
-          item={item}
-          onContextMenu={handleContextMenu}
-          onDragStart={handleDragStart}
-          onOpenModal={onOpenModal}
-          onResizeStart={handleResizeStart}
-          reservations={reservations}
-          reservationsByTable={reservationsByTable}
-          resizingReservation={resizingReservation}
-          resizePreview={resizePreview}
-          selectedReservationIds={selectedReservationIds}
-          style={style}
-          timeSlots={timeSlots}
-          virtualItems={virtualItems}
-          zoom={zoom}
-        />
+      <VirtualTimelineRow
+        collapsedSectors={collapsedSectors}
+        configDate={config.date}
+        configTimezone={config.timezone}
+        draggingReservation={draggingReservation}
+        focusedReservationId={focusedReservationId}
+        focusedReservationRef={focusedReservationRef}
+        index={index}
+        item={item}
+        onContextMenu={handleContextMenu}
+        onDragStart={handleDragStart}
+        onOpenModal={onOpenModal}
+        onResizeStart={handleResizeStart}
+        reservations={reservations}
+        reservationsByTable={reservationsByTable}
+        resizingReservation={resizingReservation}
+        resizePreview={resizePreview}
+        selectedReservationIds={selectedReservationIds}
+        style={style}
+        timeSlots={timeSlots}
+        virtualItems={virtualItems}
+        zoom={zoom}
+      />
       );
     },
     [

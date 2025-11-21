@@ -35,6 +35,8 @@ interface VirtualTimelineRowProps {
     width: number;
   } | null;
   selectedReservationIds: string[];
+  focusedReservationId?: string | null;
+  focusedReservationRef?: React.RefObject<HTMLDivElement>;
   reservations: Reservation[];
   onOpenModal?: (
     tableId?: string,
@@ -72,6 +74,8 @@ function VirtualTimelineRowComponent({
   resizingReservation,
   resizePreview,
   selectedReservationIds,
+  focusedReservationId,
+  focusedReservationRef,
   reservations,
   onOpenModal,
   onDragStart,
@@ -150,7 +154,13 @@ function VirtualTimelineRowComponent({
               key={reservation.id}
               allReservations={reservations}
               configTimezone={configTimezone}
+              focusedReservationRef={
+                focusedReservationId === reservation.id
+                  ? focusedReservationRef
+                  : undefined
+              }
               isDragging={isDragging}
+              isFocused={focusedReservationId === reservation.id}
               isSelected={isSelected}
               onDragStart={(e: React.MouseEvent) => {
                 onDragStart(reservation, e, x, absoluteIndex);

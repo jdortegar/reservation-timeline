@@ -30,6 +30,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
+import { HighContrastToggle } from '@/components/ui/HighContrastToggle';
 import type { ReservationStatus } from '@/lib/types/Reservation';
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5];
@@ -391,6 +392,9 @@ export function TimelineToolbar({ onImportCSV }: TimelineToolbarProps = {}) {
                 <ZoomIn className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* High Contrast Toggle */}
+            <HighContrastToggle />
 
             {/* Import CSV Button */}
             {onImportCSV && (
