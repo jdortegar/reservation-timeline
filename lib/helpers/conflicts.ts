@@ -134,6 +134,12 @@ export function checkServiceHours(
  *
  * Early return on first conflict found to optimize performance.
  *
+ * Performance Note:
+ * This function is called frequently during drag operations and when rendering
+ * reservation blocks. For optimal performance, callers should use memoization
+ * (e.g., useMemo, useCallback, or caching) when the inputs haven't changed.
+ * See ReservationBlock.tsx and useReservationDrag.ts for examples.
+ *
  * @param reservation - The reservation to validate
  * @param existingReservations - All existing reservations
  * @param table - The table for the reservation

@@ -3,44 +3,75 @@ import { TIMELINE_CONFIG } from '@/lib/constants/TIMELINE';
 import type { Table } from '@/lib/types/Reservation';
 
 export const createReservationSchema = (tables: Table[]) => {
-  return z.object({
-    customerName: z.string().min(1, 'Customer name is required'),
-    phone: z.string().min(1, 'Phone is required'),
-    email: z.string().email('Invalid email address').optional().or(z.literal('')),
-    partySize: z.number().min(1, 'Party size must be at least 1').max(20, 'Party size cannot exceed 20'),
-    tableId: z.string().min(1, 'Table selection is required'),
-    startTime: z.string().min(1, 'Start time is required'),
-    duration: z.number()
-      .min(TIMELINE_CONFIG.MIN_DURATION_MINUTES, `Duration must be at least ${TIMELINE_CONFIG.MIN_DURATION_MINUTES} minutes`)
-      .max(360, 'Duration cannot exceed 360 minutes (6 hours)'),
-    status: z.enum(['PENDING', 'CONFIRMED', 'SEATED', 'FINISHED', 'NO_SHOW', 'CANCELLED']),
-    priority: z.enum(['STANDARD', 'VIP', 'LARGE_GROUP']),
-    notes: z.string().optional(),
-  })
-  // Validate that tableId corresponds to an existing table
-  .refine(
-    (data) => {
-      const table = tables.find((t) => t.id === data.tableId);
-      return table !== undefined;
-    },
-    {
-      message: 'Selected table does not exist',
-      path: ['tableId'],
-    }
-  )
-  // Validate party size is within table capacity
-  .refine(
-    (data) => {
-      const table = tables.find((t) => t.id === data.tableId);
-      if (!table) return false; // Already validated above, but TypeScript needs this
-      return data.partySize >= table.capacity.min && data.partySize <= table.capacity.max;
-    },
-    {
-      message: 'Party size must be within table capacity',
-      path: ['partySize'],
-    }
+  return (
+    z
+      .object({
+        customerName: z.string().min(1, 'Customer name is required'),
+        phone: z.string().min(1, 'Phone is required'),
+        email: z
+          .string()
+          .email('Invalid email address')
+          .optional()
+          .or(z.literal('')),
+        partySize: z
+          .number({ message: 'Party size must be a number' })
+          .int('Party size must be a whole number')
+          .min(1, 'Party size must be at least 1')
+          .max(20, 'Party size cannot exceed 20')
+          .refine((val) => !isNaN(val), 'Party size cannot be NaN')
+          .refine((val) => isFinite(val), 'Party size must be a finite number'),
+        tableId: z.string().min(1, 'Table selection is required'),
+        startTime: z.string().min(1, 'Start time is required'),
+        duration: z
+          .number({ message: 'Duration must be a number' })
+          .int('Duration must be a whole number of minutes')
+          .min(
+            TIMELINE_CONFIG.MIN_DURATION_MINUTES,
+            `Duration must be at least ${TIMELINE_CONFIG.MIN_DURATION_MINUTES} minutes`,
+          )
+          .max(360, 'Duration cannot exceed 360 minutes (6 hours)')
+          .refine((val) => !isNaN(val), 'Duration cannot be NaN')
+          .refine((val) => isFinite(val), 'Duration must be a finite number'),
+        status: z.enum([
+          'PENDING',
+          'CONFIRMED',
+          'SEATED',
+          'FINISHED',
+          'NO_SHOW',
+          'CANCELLED',
+        ]),
+        priority: z.enum(['STANDARD', 'VIP', 'LARGE_GROUP']),
+        notes: z.string().optional(),
+      })
+      // Validate that tableId corresponds to an existing table
+      .refine(
+        (data) => {
+          const table = tables.find((t) => t.id === data.tableId);
+          return table !== undefined;
+        },
+        {
+          message: 'Selected table does not exist',
+          path: ['tableId'],
+        },
+      )
+      // Validate party size is within table capacity
+      .refine(
+        (data) => {
+          const table = tables.find((t) => t.id === data.tableId);
+          if (!table) return false; // Already validated above, but TypeScript needs this
+          return (
+            data.partySize >= table.capacity.min &&
+            data.partySize <= table.capacity.max
+          );
+        },
+        {
+          message: 'Party size must be within table capacity',
+          path: ['partySize'],
+        },
+      )
   );
 };
 
-export type ReservationFormData = z.infer<ReturnType<typeof createReservationSchema>>;
-
+export type ReservationFormData = z.infer<
+  ReturnType<typeof createReservationSchema>
+>;
