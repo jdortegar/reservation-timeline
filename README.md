@@ -406,7 +406,7 @@ function checkAllConflicts(
 
 **Real-time Application:**
 
-- Conflict checking during drag operations (every mouse move)
+- Conflict checking during drag operations (on each mouse move)
 - Visual feedback (red borders, conflict warnings)
 - Prevents invalid drops
 - Shows conflict resolution dialog when needed
@@ -523,6 +523,7 @@ function checkAllConflicts(
 🌐 **Try it now:** [https://reservation-timeline-chi.vercel.app/](https://reservation-timeline-chi.vercel.app/)
 
 The live demo is hosted on Vercel and includes all features:
+
 - Interactive timeline with drag & drop
 - Real-time conflict detection
 - Export & reporting functionality
@@ -532,6 +533,7 @@ The live demo is hosted on Vercel and includes all features:
 **Local Development:**
 
 To run locally:
+
 1. Clone the repository
 2. Follow the [Setup Instructions](#setup-instructions) above
 3. Run `npm run dev`

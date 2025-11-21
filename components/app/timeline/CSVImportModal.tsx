@@ -50,29 +50,104 @@ export function CSVImportModal({ isOpen, onClose }: CSVImportModalProps) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setCsvContent(content);
-      setPreviewResult(null);
-      setImportResult(null);
+      try {
+        const content = event.target?.result as string;
+        if (!content) {
+          throw new Error('File is empty or could not be read');
+        }
+        setCsvContent(content);
+        setPreviewResult(null);
+        setImportResult(null);
+      } catch (error) {
+        console.error('Error reading file:', error);
+        setImportResult({
+          success: false,
+          totalRows: 0,
+          imported: 0,
+          skipped: 0,
+          errors: [
+            {
+              row: 0,
+              data: {} as CSVReservationRow,
+              error:
+                error instanceof Error ? error.message : 'Failed to read file',
+            },
+          ],
+          reservations: [],
+        });
+      }
+    };
+    reader.onerror = () => {
+      console.error('FileReader error');
+      setImportResult({
+        success: false,
+        totalRows: 0,
+        imported: 0,
+        skipped: 0,
+        errors: [
+          {
+            row: 0,
+            data: {} as CSVReservationRow,
+            error:
+              'Failed to read file. Please ensure the file is a valid CSV file.',
+          },
+        ],
+        reservations: [],
+      });
     };
     reader.readAsText(file);
   };
 
   const handlePreview = () => {
     if (!csvContent.trim()) {
+      setPreviewResult({
+        success: false,
+        totalRows: 0,
+        imported: 0,
+        skipped: 0,
+        errors: [
+          {
+            row: 0,
+            data: {} as CSVReservationRow,
+            error: 'CSV content is empty',
+          },
+        ],
+        reservations: [],
+      });
       return;
     }
 
     try {
-      const rows = parseCSV(csvContent);
-      const result = importReservationsFromCSV(
-        rows,
-        tables,
-        reservations,
-        true,
-      );
+      // Parse CSV with error handling
+      let rows: CSVReservationRow[];
+      try {
+        rows = parseCSV(csvContent);
+        if (!rows || rows.length === 0) {
+          throw new Error('CSV file contains no data rows');
+        }
+      } catch (parseError) {
+        throw new Error(
+          parseError instanceof Error
+            ? `Failed to parse CSV: ${parseError.message}`
+            : 'Failed to parse CSV file. Please check the format.',
+        );
+      }
+
+      // Import reservations with error handling
+      let result: CSVImportResult;
+      try {
+        result = importReservationsFromCSV(rows, tables, reservations, true);
+      } catch (importError) {
+        throw new Error(
+          importError instanceof Error
+            ? `Failed to process reservations: ${importError.message}`
+            : 'Failed to process CSV data. Please check the data format.',
+        );
+      }
+
       setPreviewResult(result);
     } catch (error) {
+      console.error('Error in handlePreview:', error);
       setPreviewResult({
         success: false,
         totalRows: 0,
@@ -83,7 +158,9 @@ export function CSVImportModal({ isOpen, onClose }: CSVImportModalProps) {
             row: 0,
             data: {} as CSVReservationRow,
             error:
-              error instanceof Error ? error.message : 'Failed to parse CSV',
+              error instanceof Error
+                ? error.message
+                : 'Failed to preview CSV. Please check the file format and try again.',
           },
         ],
         reservations: [],
@@ -91,45 +168,71 @@ export function CSVImportModal({ isOpen, onClose }: CSVImportModalProps) {
     }
   };
 
-  const handleImport = () => {
-    console.log('handleImport called', { previewResult });
-
+  const handleImport = async () => {
     if (!previewResult || previewResult.reservations.length === 0) {
       console.warn('No reservations to import', { previewResult });
+      setImportResult({
+        success: false,
+        totalRows: previewResult?.totalRows || 0,
+        imported: 0,
+        skipped: previewResult?.totalRows || 0,
+        errors: [
+          {
+            row: 0,
+            data: {} as CSVReservationRow,
+            error: 'No valid reservations to import',
+          },
+        ],
+        reservations: [],
+      });
       return;
     }
 
-    console.log('Starting import', {
-      count: previewResult.reservations.length,
-    });
     setIsImporting(true);
 
     try {
       // Save to history for undo
-      console.log('Saving to history');
       saveToHistory();
 
-      // Import all reservations
-      console.log('Adding reservations', {
-        count: previewResult.reservations.length,
-      });
-      previewResult.reservations.forEach((reservation, index) => {
+      // Import all reservations with error tracking
+      const importErrors: Array<{
+        row: number;
+        data: CSVReservationRow;
+        error: string;
+      }> = [];
+      let successCount = 0;
+
+      for (let index = 0; index < previewResult.reservations.length; index++) {
+        const reservation = previewResult.reservations[index];
         try {
-          console.log(
-            `Adding reservation ${index + 1}/${
-              previewResult.reservations.length
-            }`,
+          addReservation(reservation);
+          successCount++;
+        } catch (error) {
+          console.error(
+            `Error adding reservation ${index + 1}:`,
+            error,
             reservation,
           );
-          addReservation(reservation);
-        } catch (error) {
-          console.error('Error adding reservation:', error, reservation);
+          importErrors.push({
+            row: index + 1, // 1-indexed for user display
+            data: {} as CSVReservationRow, // We don't have the original row data here
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to add reservation',
+          });
         }
-      });
+      }
 
-      console.log('Import complete, setting result');
-      setImportResult(previewResult);
-      setIsImporting(false);
+      // Set result with actual import status
+      setImportResult({
+        success: successCount > 0,
+        totalRows: previewResult.totalRows,
+        imported: successCount,
+        skipped: previewResult.skipped + importErrors.length,
+        errors: [...previewResult.errors, ...importErrors],
+        reservations: [],
+      });
     } catch (error) {
       console.error('Error during import:', error);
       setImportResult({
@@ -144,11 +247,12 @@ export function CSVImportModal({ isOpen, onClose }: CSVImportModalProps) {
             error:
               error instanceof Error
                 ? error.message
-                : 'Failed to import reservations',
+                : 'Failed to import reservations. Please try again.',
           },
         ],
         reservations: [],
       });
+    } finally {
       setIsImporting(false);
     }
   };

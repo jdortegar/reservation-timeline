@@ -152,12 +152,16 @@ export function checkAllConflicts(
   table: Table,
   excludeId?: string,
 ): ConflictCheck {
-  // Check overlap first (most common conflict type)
-  const overlapCheck = checkOverlap(
-    reservation,
-    existingReservations,
-    excludeId,
+  // Performance optimization: Pre-filter reservations by table before checking overlap
+  // This reduces complexity from O(n) to O(m) where n = all reservations, m = reservations for this table
+  // For large datasets, this significantly improves performance
+  const tableReservations = existingReservations.filter(
+    (r) => r.tableId === reservation.tableId,
   );
+
+  // Check overlap first (most common conflict type)
+  // Pass only table-specific reservations to reduce iteration
+  const overlapCheck = checkOverlap(reservation, tableReservations, excludeId);
   if (overlapCheck.hasConflict) return overlapCheck;
 
   // Check capacity (quick validation)
