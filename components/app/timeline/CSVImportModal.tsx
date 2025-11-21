@@ -316,9 +316,13 @@ Bob Johnson,+1 555-9012,,6,2025-11-21,18:30,120,CONFIRMED,LARGE_GROUP,`;
                   <Label>Errors ({previewResult.errors.length})</Label>
                   <div className="max-h-48 overflow-y-auto space-y-2">
                     {previewResult.errors.map((error, index) => (
-                      <Alert key={index} variant="destructive" className="py-2">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs">
+                      <Alert
+                        key={index}
+                        variant="destructive"
+                        className="flex items-start gap-2 [&>svg]:relative [&>svg]:left-0 [&>svg]:top-0 [&>svg~*]:pl-0"
+                      >
+                        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                        <AlertDescription className="text-xs leading-5 flex-1">
                           <strong>Row {error.row}:</strong> {error.error}
                         </AlertDescription>
                       </Alert>
