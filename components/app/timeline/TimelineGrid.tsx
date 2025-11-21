@@ -24,7 +24,7 @@ import { checkAllConflicts } from '@/lib/helpers/conflicts';
 import type { Reservation } from '@/lib/types/Reservation';
 
 interface TimelineGridProps {
-  gridContainerRef?: React.RefObject<HTMLDivElement>;
+  gridContainerRef?: React.RefObject<HTMLDivElement | null>;
   onOpenModal?: (
     tableId?: string,
     startTime?: string,
@@ -39,6 +39,7 @@ export function TimelineGrid({
 }: TimelineGridProps) {
   const internalRef = useRef<HTMLDivElement>(null);
   const gridContainerRef = externalRef || internalRef;
+  const innerGridRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{
     reservation: Reservation;
     position: { x: number; y: number };
@@ -241,13 +242,21 @@ export function TimelineGrid({
   // Use full reservations array for conflict checking, but filtered for display
   const { draggingReservation, ghostPreview, dropPreview, handleDragStart } =
     useReservationDrag({
+      onDragStart: () => {
+        // Close context menu when drag starts
+        if (contextMenu) {
+          setContextMenu(null);
+        }
+      },
       collapsedSectors,
       configDate: config.date,
       configTimezone: config.timezone,
       gridContainerRef,
+      innerGridRef,
       groupedTables,
       onUpdateReservation: updateReservation,
       reservations, // Use full array for conflict checking
+      selectedSectors,
       visibleTables,
       zoom,
     });
@@ -440,6 +449,7 @@ export function TimelineGrid({
       }}
     >
       <div
+        ref={innerGridRef}
         style={{ width: gridWidth, height: gridHeight, position: 'relative' }}
       >
         <TimelineHeader

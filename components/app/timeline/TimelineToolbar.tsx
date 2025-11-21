@@ -46,10 +46,14 @@ const ZOOM_LABELS: Record<number, string> = {
 };
 
 interface TimelineToolbarProps {
+  gridContainerRef?: React.RefObject<HTMLDivElement | null>;
   onImportCSV?: () => void;
 }
 
-export function TimelineToolbar({ gridContainerRef, onImportCSV }: TimelineToolbarProps = {}) {
+export function TimelineToolbar({
+  gridContainerRef,
+  onImportCSV,
+}: TimelineToolbarProps = {}) {
   const {
     config,
     sectors,

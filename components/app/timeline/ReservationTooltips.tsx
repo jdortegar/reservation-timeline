@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 import type { Reservation, Table } from '@/lib/types/Reservation';
 import { getConflictMessage } from '@/lib/helpers/conflicts';
 
@@ -15,39 +16,40 @@ export function ReservationTooltip({
   reservation,
   timeRange,
 }: TooltipProps) {
-  const [position, setPosition] = useState(initialPosition);
+  // Use initialPosition directly - it's already updated by the parent component
+  // when mouse moves within the reservation block
+  const position = initialPosition;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setPosition(initialPosition);
-    const handleMouseMove = (e: MouseEvent) => {
-      setPosition({ x: e.clientX + 10, y: e.clientY + 10 });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [initialPosition]);
+    setMounted(true);
+  }, []);
 
-  return (
+  const tooltipContent = (
     <div
-      className="fixed z-50 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none"
+      className="fixed bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none"
       style={{
         maxWidth: 250,
         left: position.x,
         top: position.y,
+        zIndex: 10000,
       }}
     >
       <div className="font-bold mb-2">{reservation.customer.name}</div>
       <div className="space-y-1">
         <div>
-          <span className="opacity-70">Phone:</span> {reservation.customer.phone}
+          <span className="opacity-70">Phone:</span>{' '}
+          {reservation.customer.phone}
         </div>
         {reservation.customer.email && (
           <div>
-            <span className="opacity-70">Email:</span> {reservation.customer.email}
+            <span className="opacity-70">Email:</span>{' '}
+            {reservation.customer.email}
           </div>
         )}
         <div>
-          <span className="opacity-70">Party Size:</span> {reservation.partySize}{' '}
-          guests
+          <span className="opacity-70">Party Size:</span>{' '}
+          {reservation.partySize} guests
         </div>
         <div>
           <span className="opacity-70">Time:</span> {timeRange}
@@ -66,6 +68,13 @@ export function ReservationTooltip({
       </div>
     </div>
   );
+
+  // Render tooltip in a portal to escape stacking context
+  if (typeof window === 'undefined' || !mounted) {
+    return null;
+  }
+
+  return createPortal(tooltipContent, document.body);
 }
 
 interface ConflictTooltipProps {
@@ -83,24 +92,23 @@ export function ConflictTooltip({
   conflictReason,
   table,
 }: ConflictTooltipProps) {
-  const [position, setPosition] = useState(initialPosition);
+  // Use initialPosition directly - it's already updated by the parent component
+  // when mouse moves within the reservation block
+  const position = initialPosition;
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setPosition(initialPosition);
-    const handleMouseMove = (e: MouseEvent) => {
-      setPosition({ x: e.clientX + 10, y: e.clientY + 10 });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [initialPosition]);
+    setMounted(true);
+  }, []);
 
-  return (
+  const tooltipContent = (
     <div
-      className="fixed z-50 bg-red-600 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none border border-red-400"
+      className="fixed bg-red-600 text-white text-xs rounded-lg p-3 shadow-xl pointer-events-none border border-red-400"
       style={{
         maxWidth: 280,
         left: position.x,
         top: position.y,
+        zIndex: 10000,
       }}
     >
       <div className="font-bold mb-1 flex items-center gap-2">
@@ -110,7 +118,8 @@ export function ConflictTooltip({
       <div className="mt-2">
         {conflictReason === 'overlap' && (
           <p>
-            This reservation overlaps with another reservation on the same table.
+            This reservation overlaps with another reservation on the same
+            table.
           </p>
         )}
         {conflictReason === 'capacity_exceeded' && table && (
@@ -125,5 +134,11 @@ export function ConflictTooltip({
       </div>
     </div>
   );
-}
 
+  // Render tooltip in a portal to escape stacking context
+  if (typeof window === 'undefined' || !mounted) {
+    return null;
+  }
+
+  return createPortal(tooltipContent, document.body);
+}

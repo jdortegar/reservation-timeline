@@ -20,7 +20,7 @@ import {
 import { generateEmailDigest } from '@/lib/helpers/export/generateEmailDigest';
 
 interface ExportMenuProps {
-  gridContainerRef?: React.RefObject<HTMLDivElement>;
+  gridContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function ExportMenu({ gridContainerRef }: ExportMenuProps) {

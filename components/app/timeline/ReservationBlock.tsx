@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useMemo, memo } from 'react';
+import { useState, useRef, useMemo, useEffect, memo } from 'react';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import { formatTimeRange } from '@/lib/helpers/time';
 import { parseISO } from 'date-fns';
@@ -115,11 +115,13 @@ function ReservationBlockComponent({
     if (target.dataset.resizeHandle === 'left' && onResizeStart) {
       e.stopPropagation();
       onResizeStart(e, 'left');
+      setShowTooltip(false);
       return;
     }
     if (target.dataset.resizeHandle === 'right' && onResizeStart) {
       e.stopPropagation();
       onResizeStart(e, 'right');
+      setShowTooltip(false);
       return;
     }
 
@@ -130,7 +132,8 @@ function ReservationBlockComponent({
       onDragStart(e);
     }
     setHasDragged(false);
-    setShowTooltip(false);
+    // Don't hide tooltip here - it will be hidden when isDraggingProp becomes true
+    // This allows tooltip to stay visible during hover before drag starts
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -167,6 +170,14 @@ function ReservationBlockComponent({
       e.stopPropagation();
     }
   };
+
+  // Hide tooltip when dragging starts
+  useEffect(() => {
+    if (isDraggingProp) {
+      setShowTooltip(false);
+      setShowConflictTooltip(false);
+    }
+  }, [isDraggingProp]);
 
   const blockStyle = isDraggingProp
     ? {
@@ -238,21 +249,68 @@ function ReservationBlockComponent({
         }}
         onMouseDown={handleMouseDown}
         onMouseEnter={(e) => {
-          if (!isDraggingProp) {
-            setTooltipPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+          if (!isDraggingProp && !isCancelled) {
+            // Position tooltip near the reservation block, not far from cursor
+            const blockRect = blockRef.current?.getBoundingClientRect();
+            if (blockRect) {
+              // Position tooltip to the right of the block, vertically centered
+              setTooltipPosition({
+                x: blockRect.right + 8,
+                y: blockRect.top + blockRect.height / 2,
+              });
+            } else {
+              // Fallback to cursor position if block ref not available
+              setTooltipPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+            }
             setShowTooltip(true);
+            setShowConflictTooltip(false);
+          }
+        }}
+        onMouseMove={(e) => {
+          // Update tooltip position as mouse moves within the block
+          if (!isDraggingProp && !isCancelled) {
+            if (showTooltip || showConflictTooltip) {
+              const blockRect = blockRef.current?.getBoundingClientRect();
+              if (blockRect) {
+                // Keep tooltip positioned relative to block, not cursor
+                setTooltipPosition({
+                  x: blockRect.right + 8,
+                  y: blockRect.top + blockRect.height / 2,
+                });
+              } else {
+                setTooltipPosition({ x: e.clientX + 10, y: e.clientY + 10 });
+              }
+            }
           }
         }}
         onMouseLeave={() => {
           if (!isDraggingProp) {
             setShowTooltip(false);
+            setShowConflictTooltip(false);
           }
         }}
         onContextMenu={(e) => {
           if (!isDraggingProp && !isCancelled && onContextMenu) {
             e.preventDefault();
             e.stopPropagation();
-            onContextMenu(e, reservation);
+            // Position menu relative to the reservation block, not just cursor
+            // Use the block's bounding box to position menu near the clicked slot
+            const blockRect = blockRef.current?.getBoundingClientRect();
+            if (blockRect) {
+              // Position menu at the right edge of the block, vertically centered
+              const menuX = blockRect.right + 8;
+              const menuY = blockRect.top + blockRect.height / 2;
+              // Create a synthetic event with adjusted position
+              const syntheticEvent = {
+                ...e,
+                clientX: menuX,
+                clientY: menuY,
+              } as React.MouseEvent;
+              onContextMenu(syntheticEvent, reservation);
+            } else {
+              // Fallback to cursor position if block ref not available
+              onContextMenu(e, reservation);
+            }
           }
         }}
       >
@@ -264,9 +322,11 @@ function ReservationBlockComponent({
             title={getConflictMessage(conflictReason, table)}
             onMouseEnter={(e) => {
               if (!isDraggingProp) {
+                // Position conflict tooltip near the warning icon
+                const iconRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                 setTooltipPosition({
-                  x: e.clientX + 10,
-                  y: e.clientY + 10,
+                  x: iconRect.right + 8,
+                  y: iconRect.top + iconRect.height / 2,
                 });
                 setShowConflictTooltip(true);
                 setShowTooltip(false);

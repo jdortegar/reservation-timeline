@@ -64,7 +64,12 @@ export function CreateDragArea({
   }, [configDate]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
+    // Only handle left mouse button (button 0)
+    // Right clicks (button 2) should pass through to reservation blocks
+    if (e.button !== 0) {
+      // Don't prevent default for right-clicks - let them bubble to reservation blocks
+      return;
+    }
 
     // Don't start create drag if:
     // - A drag or resize is already active
@@ -251,6 +256,15 @@ export function CreateDragArea({
         aria-label={`Create new reservation on ${table.name}. Click and drag to select time slot.`}
         className="absolute inset-0 cursor-crosshair"
         onMouseDown={handleMouseDown}
+        onContextMenu={(e) => {
+          // Allow right-click events to pass through to reservation blocks
+          // Don't prevent default - let the event bubble to reservation blocks
+          const target = e.target as HTMLElement;
+          if (target.closest('[data-reservation-block]')) {
+            // If clicking on a reservation block, don't interfere
+            return;
+          }
+        }}
         style={{ zIndex: 1, pointerEvents: 'auto' }}
       />
       {isDragging && startSlot !== null && endSlot !== null && (

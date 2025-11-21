@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
 import type { Reservation, ReservationStatus } from '@/lib/types/Reservation';
 import clsx from 'clsx';
@@ -62,6 +63,11 @@ export function ReservationContextMenu({
   onDelete,
 }: ReservationContextMenuProps) {
   const [showStatusSubmenu, setShowStatusSubmenu] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleStatusClick = (status: ReservationStatus) => {
     onChangeStatus(reservation.id, status);
@@ -93,9 +99,11 @@ export function ReservationContextMenu({
     onClose();
   };
 
-  return (
+  if (!mounted) return null;
+
+  const menuContent = (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - only capture clicks, not drag events */}
       <div
         className="fixed inset-0 z-40"
         onClick={onClose}
@@ -103,6 +111,22 @@ export function ReservationContextMenu({
           e.preventDefault();
           onClose();
         }}
+        onMouseDown={(e) => {
+          // Only close on left click, allow drag operations to pass through
+          if (e.button === 0) {
+            onClose();
+          }
+        }}
+        // Don't capture mouse move/up events - let them pass through for drag operations
+        onMouseMove={(e) => {
+          // Allow mouse move events to pass through
+          e.stopPropagation();
+        }}
+        onMouseUp={(e) => {
+          // Allow mouse up events to pass through
+          e.stopPropagation();
+        }}
+        style={{ pointerEvents: 'auto' }}
       />
       {/* Menu */}
       <div
@@ -110,6 +134,7 @@ export function ReservationContextMenu({
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
+          position: 'fixed',
         }}
         onClick={(e) => e.stopPropagation()}
         onContextMenu={(e) => e.preventDefault()}
@@ -192,4 +217,6 @@ export function ReservationContextMenu({
       </div>
     </>
   );
+
+  return createPortal(menuContent, document.body);
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { createPortal } from 'react-dom';
+import { useEffect, useState } from 'react';
 import { formatTimeRange, slotIndexToTime } from '@/lib/helpers/time';
 import { addMinutes } from 'date-fns';
 import { RESERVATION_STATUS_COLORS } from '@/lib/constants/TIMELINE';
@@ -34,8 +36,13 @@ export function ReservationGhostBlock({
 }: ReservationGhostBlockProps) {
   const backgroundColor =
     RESERVATION_STATUS_COLORS[reservation.status] || '#9CA3AF';
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const ghostContent = (
     <div
       className="fixed rounded px-2 py-1 border-2 border-solid pointer-events-none shadow-lg"
       style={{
@@ -77,4 +84,11 @@ export function ReservationGhostBlock({
       )}
     </div>
   );
+
+  // Render ghost in a portal to escape stacking context and scroll issues
+  if (typeof window === 'undefined' || !mounted) {
+    return null;
+  }
+
+  return createPortal(ghostContent, document.body);
 }

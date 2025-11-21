@@ -14,6 +14,7 @@ import type { Reservation, Table, Sector } from '@/lib/types/Reservation';
 
 interface UseReservationDragProps {
   gridContainerRef: RefObject<HTMLDivElement | null>;
+  innerGridRef?: RefObject<HTMLDivElement | null>;
   zoom: number;
   configDate: string;
   configTimezone?: string;
@@ -23,6 +24,7 @@ interface UseReservationDragProps {
     tables: Table[];
   }>;
   collapsedSectors: string[];
+  selectedSectors: string[];
   reservations: Reservation[];
   onUpdateReservation: (
     reservationId: string,
@@ -32,6 +34,7 @@ interface UseReservationDragProps {
       tableId?: string;
     },
   ) => void;
+  onDragStart?: () => void;
 }
 
 interface DraggingReservation {
@@ -67,14 +70,17 @@ interface DropPreview {
 
 export function useReservationDrag({
   gridContainerRef,
+  innerGridRef,
   zoom,
   configDate,
   configTimezone,
   visibleTables,
   groupedTables,
   collapsedSectors,
+  selectedSectors,
   reservations,
   onUpdateReservation,
+  onDragStart: onDragStartCallback,
 }: UseReservationDragProps) {
   const [draggingReservation, setDraggingReservation] =
     useState<DraggingReservation | null>(null);
@@ -103,7 +109,10 @@ export function useReservationDrag({
     const gridContainer = gridContainerRef?.current;
     if (!gridContainer) return;
 
-    const gridRect = gridContainer.getBoundingClientRect();
+    // Use inner grid ref if available, otherwise use outer container
+    // The inner div is where the ghost is actually positioned
+    const targetElement = innerGridRef?.current || gridContainer;
+    const gridRect = targetElement.getBoundingClientRect();
     const pointerGridX = e.clientX - gridRect.left - 200;
     const pointerGridY = e.clientY - gridRect.top - 70;
     const originalTop = 0; // Relative to TimelineRow
@@ -124,15 +133,41 @@ export function useReservationDrag({
       clickOffsetY,
     });
 
+    // Call onDragStart callback if provided (e.g., to close context menu)
+    if (onDragStartCallback) {
+      onDragStartCallback();
+    }
+
     // Store initial mouse position for immediate first update
     // This ensures the first RAF update processes the initial position
     latestMouseEventRef.current = {
       clientX: e.clientX,
       clientY: e.clientY,
     } as MouseEvent;
+
+    // Immediately set initial ghost preview position
+    // Ghost is rendered in a Portal with position: fixed, so use viewport coordinates directly
+    const blockWidth = durationToWidth(reservation.durationMinutes, zoom);
+    const blockHeight = TIMELINE_CONFIG.ROW_HEIGHT_PX;
+    const initialGhostLeft = e.clientX - clickOffsetX;
+    const initialGhostTop = e.clientY - clickOffsetY;
+
+    setCursorPosition({ x: e.clientX, y: e.clientY });
+    setGhostPreview({
+      left: initialGhostLeft,
+      top: initialGhostTop,
+      width: blockWidth,
+      height: blockHeight,
+      slotIndex: timeToSlotIndex(
+        parseISO(reservation.startTime),
+        configDate,
+        configTimezone,
+      ),
+      tableIndex: originalTableIndex,
+    });
   };
 
-  // Handle mouse move and mouse up for drag
+  // Handle mouse move, scroll, and mouse up for drag
   useEffect(() => {
     if (!draggingReservation) {
       // Clean up RAF if drag ends
@@ -144,10 +179,236 @@ export function useReservationDrag({
       return;
     }
 
+    const updateGhostAndDropPreview = (mouseEvent: MouseEvent | null) => {
+      // Use latest mouse event if available, otherwise use cursor position
+      const currentMouseX = mouseEvent?.clientX ?? cursorPosition?.x ?? 0;
+      const currentMouseY = mouseEvent?.clientY ?? cursorPosition?.y ?? 0;
+
+      const gridContainer = gridContainerRef?.current;
+      if (!gridContainer) return;
+
+      // Use inner grid ref if available, otherwise use outer container
+      const targetElement = innerGridRef?.current || gridContainer;
+      const gridRect = targetElement.getBoundingClientRect();
+      const currentPointerGridX = currentMouseX - gridRect.left - 200;
+      const currentPointerGridY = currentMouseY - gridRect.top - 70;
+
+      // Store cursor position for ghost that follows cursor
+      if (mouseEvent) {
+        setCursorPosition({ x: currentMouseX, y: currentMouseY });
+      }
+
+      const deltaX = currentPointerGridX - draggingReservation.pointerGridX;
+      const deltaY = currentPointerGridY - draggingReservation.pointerGridY;
+
+      const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
+      const absGridDeltaX = Math.abs(deltaX);
+      const absGridDeltaY = Math.abs(deltaY);
+      const minDragThresholdX = cellWidth * 0.3;
+      const minDragThresholdY = TIMELINE_CONFIG.ROW_HEIGHT_PX * 0.3;
+
+      const hasHorizontalMovement = absGridDeltaX >= minDragThresholdX;
+      const hasVerticalMovement = absGridDeltaY >= minDragThresholdY;
+
+      const blockWidth = durationToWidth(
+        draggingReservation.reservation.durationMinutes,
+        zoom,
+      );
+      const blockHeight = TIMELINE_CONFIG.ROW_HEIGHT_PX;
+
+      // Calculate where the block's left edge would be in grid coordinates based on cursor
+      // Ghost follows cursor: ghostLeft = e.clientX - clickOffsetX
+      // The ghost position in viewport coordinates
+      const ghostLeftInViewport =
+        currentMouseX - draggingReservation.clickOffsetX;
+      const ghostTopInViewport =
+        currentMouseY - draggingReservation.clickOffsetY;
+
+      // Convert viewport coordinates to grid coordinates
+      // gridRect.left is the left edge of the grid container in viewport
+      // 200 is the sidebar width, so grid content starts at gridRect.left + 200
+      // We need to account for scroll position: gridContainer.scrollLeft
+      const scrollLeft = gridContainer.scrollLeft || 0;
+      const scrollTop = gridContainer.scrollTop || 0;
+      const blockLeftInGrid =
+        ghostLeftInViewport - (gridRect.left + 200) + scrollLeft;
+      // gridRect.top is the top edge of the grid container in viewport
+      // 70 is the header height, so grid content starts at gridRect.top + 70
+      const blockTopInGrid =
+        ghostTopInViewport - (gridRect.top + 70) + scrollTop;
+
+      // Calculate snapped drop position based on current cursor position
+      // Start with original position as fallback
+      let dropLeft = draggingReservation.originalLeft;
+      let dropSlotIndex = timeToSlotIndex(
+        parseISO(draggingReservation.reservation.startTime),
+        configDate,
+        configTimezone,
+      );
+      let dropTableIndex = draggingReservation.originalTableIndex;
+
+      // Calculate drop position from current cursor position
+      // Use the block's left edge position in grid coordinates
+      const safeBlockLeft = Math.max(0, blockLeftInGrid);
+      const newSlot = xToSlot(safeBlockLeft, zoom);
+      dropLeft = slotToX(newSlot, zoom);
+      dropSlotIndex = newSlot;
+
+      const safeBlockTop = Math.max(0, blockTopInGrid);
+      const newTableIndex = yToTable(safeBlockTop);
+      if (newTableIndex >= 0 && newTableIndex < visibleTables.length) {
+        dropTableIndex = newTableIndex;
+      }
+
+      // Calculate absolute top position for drop preview (snapped position)
+      // This must match exactly how rows are rendered in TimelineGrid using react-window
+      // Structure: Header (70px) -> List (at top: 70) -> [Sector Header (40px) -> Rows (60px each)]
+      // React-window calculates positions as cumulative heights of previous items
+      // We need to replicate this calculation exactly
+      const headerHeight = 70;
+      const sectorHeaderHeight = 40;
+
+      // Start at header height (where List begins)
+      let targetRowY = headerHeight;
+      let currentTableIndex = 0;
+      let foundTarget = false;
+
+      // Ensure dropTableIndex is valid
+      const validDropTableIndex = Math.max(
+        0,
+        Math.min(dropTableIndex, visibleTables.length - 1),
+      );
+
+      // Replicate the virtualItems array structure to calculate position
+      // This matches exactly how useVirtualItems creates the array
+      for (const group of groupedTables) {
+        const isCollapsed =
+          group.sector && collapsedSectors.includes(group.sector.id);
+
+        // Add sector header if it exists (matches virtualItems structure)
+        if (group.sector) {
+          // Check if selected sectors filter includes this sector
+          const isSectorSelected =
+            selectedSectors.length === 0 ||
+            selectedSectors.includes(group.sector.id);
+
+          if (isSectorSelected && !isCollapsed) {
+            targetRowY += sectorHeaderHeight;
+          }
+        }
+
+        // Add table rows if not collapsed (matches virtualItems structure)
+        if (!isCollapsed) {
+          for (const table of group.tables) {
+            // Filter by selected sectors (matches virtualItems filtering)
+            if (
+              selectedSectors.length === 0 ||
+              selectedSectors.includes(table.sectorId)
+            ) {
+              if (currentTableIndex === validDropTableIndex) {
+                // Found target row - break out of all loops
+                foundTarget = true;
+                break;
+              }
+              targetRowY += TIMELINE_CONFIG.ROW_HEIGHT_PX;
+              currentTableIndex++;
+            }
+          }
+        }
+
+        // Break if we found the target
+        if (foundTarget) {
+          break;
+        }
+      }
+
+      // Ghost preview follows cursor exactly
+      // Ghost is rendered in a Portal with position: fixed, so use viewport coordinates directly
+      const ghostLeft = ghostLeftInViewport;
+      const ghostTop = ghostTopInViewport;
+
+      setGhostPreview({
+        left: ghostLeft,
+        top: ghostTop,
+        width: blockWidth,
+        height: blockHeight,
+        slotIndex: dropSlotIndex,
+        tableIndex: dropTableIndex,
+      });
+
+      // Check for conflicts at the drop position
+      const dropTable = visibleTables[dropTableIndex];
+      const dropStartTime = slotIndexToTime(
+        dropSlotIndex,
+        configDate,
+        configTimezone,
+      );
+      const dropEndTime = addMinutes(
+        dropStartTime,
+        draggingReservation.reservation.durationMinutes,
+      );
+
+      // Create a temporary reservation to check conflicts
+      const tempReservation: Reservation = {
+        ...draggingReservation.reservation,
+        tableId: dropTable?.id || draggingReservation.reservation.tableId,
+        startTime: dropStartTime.toISOString(),
+        endTime: dropEndTime.toISOString(),
+      };
+
+      const conflictCheck = dropTable
+        ? checkAllConflicts(
+            tempReservation,
+            reservations,
+            dropTable,
+            draggingReservation.reservation.id,
+          )
+        : {
+            hasConflict: true,
+            conflictingReservationIds: [],
+            reason: undefined,
+          };
+
+      // Drop preview shows snapped position
+      // Convert grid-relative coordinates to viewport coordinates for Portal rendering
+      // dropLeft is relative to timeline content area (after 200px sidebar), targetRowY is relative to inner grid div top
+      // Use gridRect (outer container) for consistency with ghost calculation
+      // The timeline content area starts at gridRect.left + 200 (sidebar width)
+      // dropLeft is the position within the timeline content (from slotToX)
+      // Account for scroll: dropLeft - scrollLeft converts from grid coordinates to viewport
+      const dropScrollLeft = gridContainer.scrollLeft || 0;
+      const dropLeftInViewport =
+        gridRect.left + 200 + dropLeft - dropScrollLeft;
+      // Use innerGridRect for vertical positioning to match row positions
+      const innerGridRect =
+        innerGridRef?.current?.getBoundingClientRect() || gridRect;
+      const dropTopInViewport = innerGridRect.top + targetRowY;
+
+      setDropPreview({
+        left: dropLeftInViewport,
+        top: dropTopInViewport,
+        width: blockWidth,
+        height: blockHeight,
+        slotIndex: dropSlotIndex,
+        tableIndex: dropTableIndex,
+        hasConflict: conflictCheck.hasConflict,
+        conflictReason: conflictCheck.reason,
+      });
+    };
+
+    const handleScroll = () => {
+      // Update ghost and drop preview on scroll using latest mouse position
+      if (latestMouseEventRef.current) {
+        processMouseMove(latestMouseEventRef.current);
+      }
+    };
+
     const processMouseMove = (e: MouseEvent) => {
       const gridContainer = gridContainerRef?.current;
       if (!gridContainer) return;
 
+      // Get bounding rect of outer container for coordinate conversions
+      // (needed for converting grid-relative positions to viewport coordinates)
       const gridRect = gridContainer.getBoundingClientRect();
       const currentPointerGridX = e.clientX - gridRect.left - 200;
       const currentPointerGridY = e.clientY - gridRect.top - 70;
@@ -159,11 +420,10 @@ export function useReservationDrag({
       const deltaY = currentPointerGridY - draggingReservation.pointerGridY;
 
       const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
-      const rowHeight = TIMELINE_CONFIG.ROW_HEIGHT_PX;
       const absGridDeltaX = Math.abs(deltaX);
       const absGridDeltaY = Math.abs(deltaY);
       const minDragThresholdX = cellWidth * 0.3;
-      const minDragThresholdY = rowHeight * 0.3;
+      const minDragThresholdY = TIMELINE_CONFIG.ROW_HEIGHT_PX * 0.3;
 
       const hasHorizontalMovement = absGridDeltaX >= minDragThresholdX;
       const hasVerticalMovement = absGridDeltaY >= minDragThresholdY;
@@ -172,7 +432,7 @@ export function useReservationDrag({
         draggingReservation.reservation.durationMinutes,
         zoom,
       );
-      const blockHeight = rowHeight;
+      const blockHeight = TIMELINE_CONFIG.ROW_HEIGHT_PX;
 
       // Calculate where the block's left edge would be in grid coordinates based on cursor
       // Ghost follows cursor: ghostLeft = e.clientX - clickOffsetX
@@ -194,6 +454,7 @@ export function useReservationDrag({
         ghostTopInViewport - (gridRect.top + 70) + scrollTop;
 
       // Calculate snapped drop position based on current cursor position
+      // Start with original position as fallback
       let dropLeft = draggingReservation.originalLeft;
       let dropSlotIndex = timeToSlotIndex(
         parseISO(draggingReservation.reservation.startTime),
@@ -202,7 +463,8 @@ export function useReservationDrag({
       );
       let dropTableIndex = draggingReservation.originalTableIndex;
 
-      // Always calculate drop position from current cursor position
+      // Calculate drop position from current cursor position
+      // Use the block's left edge position in grid coordinates
       const safeBlockLeft = Math.max(0, blockLeftInGrid);
       const newSlot = xToSlot(safeBlockLeft, zoom);
       dropLeft = slotToX(newSlot, zoom);
@@ -215,12 +477,15 @@ export function useReservationDrag({
       }
 
       // Calculate absolute top position for drop preview (snapped position)
-      // This must match exactly how rows are rendered in TimelineGrid
-      // Structure: Header (70px) -> [Sector Header (40px) -> Rows (60px each)] for each group
+      // This must match exactly how rows are rendered in TimelineGrid using react-window
+      // Structure: Header (70px) -> List (at top: 70) -> [Sector Header (40px) -> Rows (60px each)]
+      // React-window calculates positions as cumulative heights of previous items
+      // We need to replicate this calculation exactly
       const headerHeight = 70;
       const sectorHeaderHeight = 40;
-      let targetRowY = headerHeight;
 
+      // Start at header height (where List begins)
+      let targetRowY = headerHeight;
       let currentTableIndex = 0;
       let foundTarget = false;
 
@@ -230,60 +495,46 @@ export function useReservationDrag({
         Math.min(dropTableIndex, visibleTables.length - 1),
       );
 
+      // Replicate the virtualItems array structure to calculate position
+      // This matches exactly how useVirtualItems creates the array
       for (const group of groupedTables) {
         const isCollapsed =
           group.sector && collapsedSectors.includes(group.sector.id);
-        const visibleGroupTables = isCollapsed ? [] : group.tables;
 
-        // Add sector header for this group BEFORE processing its rows
-        // This matches the rendering: SectorHeader is rendered before TimelineRows
-        if (group.sector && !isCollapsed) {
-          targetRowY += sectorHeaderHeight;
-        }
+        // Add sector header if it exists (matches virtualItems structure)
+        if (group.sector) {
+          // Check if selected sectors filter includes this sector
+          const isSectorSelected =
+            selectedSectors.length === 0 ||
+            selectedSectors.includes(group.sector.id);
 
-        // Process each row in this group
-        for (let idx = 0; idx < visibleGroupTables.length; idx++) {
-          // Check if this is the target row
-          // targetRowY is currently the position where THIS row starts
-          if (currentTableIndex === validDropTableIndex) {
-            foundTarget = true;
-            break;
-          }
-          // Move to the next row position
-          targetRowY += rowHeight;
-          currentTableIndex++;
-        }
-
-        if (foundTarget) {
-          break;
-        }
-      }
-
-      // Fallback: if target wasn't found, calculate based on table index directly
-      // This shouldn't happen, but ensures we always have a valid position
-      if (!foundTarget && validDropTableIndex < visibleTables.length) {
-        // Recalculate from scratch as fallback
-        targetRowY = headerHeight;
-        currentTableIndex = 0;
-        for (const group of groupedTables) {
-          const isCollapsed =
-            group.sector && collapsedSectors.includes(group.sector.id);
-          const visibleGroupTables = isCollapsed ? [] : group.tables;
-
-          if (group.sector && !isCollapsed) {
+          if (isSectorSelected && !isCollapsed) {
             targetRowY += sectorHeaderHeight;
           }
+        }
 
-          for (let idx = 0; idx < visibleGroupTables.length; idx++) {
-            if (currentTableIndex === validDropTableIndex) {
-              break;
+        // Add table rows if not collapsed (matches virtualItems structure)
+        if (!isCollapsed) {
+          for (const table of group.tables) {
+            // Filter by selected sectors (matches virtualItems filtering)
+            if (
+              selectedSectors.length === 0 ||
+              selectedSectors.includes(table.sectorId)
+            ) {
+              if (currentTableIndex === validDropTableIndex) {
+                // Found target row - break out of all loops
+                foundTarget = true;
+                break;
+              }
+              targetRowY += TIMELINE_CONFIG.ROW_HEIGHT_PX;
+              currentTableIndex++;
             }
-            targetRowY += rowHeight;
-            currentTableIndex++;
           }
-          if (currentTableIndex > validDropTableIndex) {
-            break;
-          }
+        }
+
+        // Break if we found the target
+        if (foundTarget) {
+          break;
         }
       }
 
@@ -334,9 +585,23 @@ export function useReservationDrag({
           };
 
       // Drop preview shows snapped position
+      // Convert grid-relative coordinates to viewport coordinates for Portal rendering
+      // dropLeft is relative to timeline content area (after 200px sidebar), targetRowY is relative to inner grid div top
+      // Use gridRect (outer container) for consistency with ghost calculation
+      // The timeline content area starts at gridRect.left + 200 (sidebar width)
+      // dropLeft is the position within the timeline content (from slotToX)
+      // Account for scroll: dropLeft - scrollLeft converts from grid coordinates to viewport
+      const dropScrollLeft = gridContainer.scrollLeft || 0;
+      const dropLeftInViewport =
+        gridRect.left + 200 + dropLeft - dropScrollLeft;
+      // Use innerGridRect for vertical positioning to match row positions
+      const innerGridRect =
+        innerGridRef?.current?.getBoundingClientRect() || gridRect;
+      const dropTopInViewport = innerGridRect.top + targetRowY;
+
       setDropPreview({
-        left: 200 + dropLeft,
-        top: targetRowY,
+        left: dropLeftInViewport,
+        top: dropTopInViewport,
         width: blockWidth,
         height: blockHeight,
         slotIndex: dropSlotIndex,
@@ -358,123 +623,71 @@ export function useReservationDrag({
         return;
       }
 
+      // Get the current dropPreview value (might be stale in closure, so we'll use a ref or recalculate)
+      // For now, let's recalculate the drop position from the current mouse position
+      // This ensures we always have the correct position even if dropPreview state is stale
       const gridRect = gridContainer.getBoundingClientRect();
-
-      // Use the same calculation as handleMouseMove to get the drop position
-      const ghostLeftInViewport = e.clientX - draggingReservation.clickOffsetX;
-      const ghostTopInViewport = e.clientY - draggingReservation.clickOffsetY;
-
       const scrollLeft = gridContainer.scrollLeft || 0;
       const scrollTop = gridContainer.scrollTop || 0;
+
+      // Calculate block position from mouse
+      const ghostLeftInViewport = e.clientX - draggingReservation.clickOffsetX;
+      const ghostTopInViewport = e.clientY - draggingReservation.clickOffsetY;
       const blockLeftInGrid =
         ghostLeftInViewport - (gridRect.left + 200) + scrollLeft;
       const blockTopInGrid =
         ghostTopInViewport - (gridRect.top + 70) + scrollTop;
 
-      // Calculate the snapped drop position (same as preview)
       const safeBlockLeft = Math.max(0, blockLeftInGrid);
-      const newSlot = xToSlot(safeBlockLeft, zoom);
       const safeBlockTop = Math.max(0, blockTopInGrid);
-      const newTableIndex = yToTable(safeBlockTop);
 
-      // Check if there was enough movement to trigger an update
-      const originalSlot = timeToSlotIndex(
-        parseISO(draggingReservation.reservation.startTime),
+      // Use dropPreview if available (it has the snapped position), otherwise calculate from mouse
+      const finalSlotIndex =
+        dropPreview?.slotIndex ?? xToSlot(safeBlockLeft, zoom);
+      const finalTableIndex = dropPreview?.tableIndex ?? yToTable(safeBlockTop);
+
+      // Ensure table index is valid
+      const validTableIndex = Math.max(
+        0,
+        Math.min(finalTableIndex, visibleTables.length - 1),
+      );
+      const newTable = visibleTables[validTableIndex];
+
+      if (!newTable) return;
+
+      const newStartTime = slotIndexToTime(
+        finalSlotIndex,
         configDate,
         configTimezone,
       );
-      const slotDiff = newSlot - originalSlot;
-      const tableDiff = newTableIndex - draggingReservation.originalTableIndex;
+      const newEndTime = addMinutes(
+        newStartTime,
+        draggingReservation.reservation.durationMinutes,
+      );
 
-      const cellWidth = TIMELINE_CONFIG.CELL_WIDTH_PX * zoom;
-      const rowHeight = TIMELINE_CONFIG.ROW_HEIGHT_PX;
-      const minDragThresholdX = cellWidth * 0.3;
-      const minDragThresholdY = rowHeight * 0.3;
+      // Create temporary reservation to check conflicts
+      const tempReservation: Reservation = {
+        ...draggingReservation.reservation,
+        tableId: newTable.id,
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+      };
 
-      // Calculate movement deltas to check thresholds
-      const originalBlockLeft = draggingReservation.originalLeft;
-      const blockLeftDelta = safeBlockLeft - originalBlockLeft;
-      const blockTopDelta = safeBlockTop - draggingReservation.originalTop;
-      const absBlockDeltaX = Math.abs(blockLeftDelta);
-      const absBlockDeltaY = Math.abs(blockTopDelta);
+      // Check for conflicts
+      const conflictCheck = checkAllConflicts(
+        tempReservation,
+        reservations,
+        newTable,
+        draggingReservation.reservation.id,
+      );
 
-      const hasHorizontalMovement = absBlockDeltaX >= minDragThresholdX;
-      const hasVerticalMovement = absBlockDeltaY >= minDragThresholdY;
-
-      const updates: {
-        startTime?: string;
-        endTime?: string;
-        tableId?: string;
-      } = {};
-
-      // Calculate potential new times and table
-      let newStartTime: Date | null = null;
-      let newEndTime: Date | null = null;
-      let newTable: Table | null = null;
-
-      if (hasHorizontalMovement && Math.abs(slotDiff) <= 200) {
-        newStartTime = slotIndexToTime(newSlot, configDate, configTimezone);
-        newEndTime = addMinutes(
-          newStartTime,
-          draggingReservation.reservation.durationMinutes,
-        );
-      }
-
-      if (
-        hasVerticalMovement &&
-        newTableIndex >= 0 &&
-        newTableIndex < visibleTables.length &&
-        newTableIndex !== draggingReservation.originalTableIndex
-      ) {
-        newTable = visibleTables[newTableIndex];
-      }
-
-      // If we have changes, check for conflicts before applying
-      if (newStartTime || newTable) {
-        const finalStartTime = newStartTime
-          ? newStartTime
-          : parseISO(draggingReservation.reservation.startTime);
-        const finalEndTime = newEndTime
-          ? newEndTime
-          : parseISO(draggingReservation.reservation.endTime);
-        const finalTable =
-          newTable || visibleTables[draggingReservation.originalTableIndex];
-
-        // Create temporary reservation to check conflicts
-        const tempReservation: Reservation = {
-          ...draggingReservation.reservation,
-          tableId: finalTable.id,
-          startTime: finalStartTime.toISOString(),
-          endTime: finalEndTime.toISOString(),
-        };
-
-        // Check for conflicts
-        const conflictCheck = checkAllConflicts(
-          tempReservation,
-          reservations,
-          finalTable,
-          draggingReservation.reservation.id,
-        );
-
-        // Only apply updates if there's no conflict
-        if (!conflictCheck.hasConflict) {
-          if (newStartTime && newEndTime) {
-            updates.startTime = newStartTime.toISOString();
-            updates.endTime = newEndTime.toISOString();
-          }
-
-          if (newTable) {
-            updates.tableId = newTable.id;
-          }
-
-          if (Object.keys(updates).length > 0) {
-            onUpdateReservation(draggingReservation.reservation.id, updates);
-          }
-        }
-        // If there's a conflict, silently prevent the drop (no update)
-      } else if (Object.keys(updates).length > 0) {
-        // Fallback for edge cases
-        onUpdateReservation(draggingReservation.reservation.id, updates);
+      // Only apply if no conflict
+      if (!conflictCheck.hasConflict) {
+        onUpdateReservation(draggingReservation.reservation.id, {
+          startTime: newStartTime.toISOString(),
+          endTime: newEndTime.toISOString(),
+          tableId: newTable.id,
+        });
       }
 
       setDraggingReservation(null);
